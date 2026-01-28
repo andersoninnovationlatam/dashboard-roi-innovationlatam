@@ -2,43 +2,113 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import { correlationService } from '../../services/correlationService'
+import { calcularMetricasPorTipo } from '../../services/indicatorMetricsService'
 import Card from '../../components/common/Card'
 import Loading from '../../components/common/Loading'
 import Button from '../../components/common/Button'
 import LineChart from '../../components/charts/LineChart'
 import BarChart from '../../components/charts/BarChart'
 import RadarChart from '../../components/charts/RadarChart'
+import ProdutividadeCharts from '../../components/dashboard/ProdutividadeCharts'
+import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaCard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
 const Dashboard = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getProjectById, getIndicatorsByProjectId, calculateProjectROI, loading } = useData()
+  const { getProjectById, getIndicatorsByProjectId, getIndicatorById, calculateProjectROI, loading } = useData()
   
   const project = getProjectById(id)
-  const indicators = getIndicatorsByProjectId(id)
+  const [indicators, setIndicators] = useState([])
+  const [indicatorsLoading, setIndicatorsLoading] = useState(true)
+  const [completeIndicators, setCompleteIndicators] = useState([])
+  const [metricas, setMetricas] = useState(null)
+  const [metricasLoading, setMetricasLoading] = useState(false)
 
-  const metricas = useMemo(() => {
-    if (!project) {
-      return null
+  // Carrega indicadores completos (com baselineData e postIAData)
+  useEffect(() => {
+    const loadCompleteIndicators = async () => {
+      if (!id) {
+        setIndicators([])
+        setCompleteIndicators([])
+        setIndicatorsLoading(false)
+        return
+      }
+
+      setIndicatorsLoading(true)
+      try {
+        const projectIndicators = await getIndicatorsByProjectId(id)
+        setIndicators(projectIndicators || [])
+
+        // Filtra IDs válidos (UUIDs) antes de buscar dados completos
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        const validIndicators = (projectIndicators || []).filter(ind => 
+          ind && ind.id && uuidRegex.test(ind.id)
+        )
+
+        // Carrega dados completos de cada indicador válido
+        const complete = await Promise.all(
+          validIndicators.map(async (ind) => {
+            try {
+              const completeIndicator = await getIndicatorById(ind.id)
+              return completeIndicator
+            } catch (error) {
+              console.error(`Erro ao carregar indicador ${ind.id}:`, error)
+              return ind
+            }
+          })
+        )
+        setCompleteIndicators(complete.filter(Boolean))
+      } catch (error) {
+        console.error('Erro ao carregar indicadores:', error)
+        setIndicators([])
+        setCompleteIndicators([])
+      } finally {
+        setIndicatorsLoading(false)
+      }
     }
-    if (indicators.length === 0) {
-      return null
+
+    loadCompleteIndicators()
+  }, [id, getIndicatorsByProjectId, getIndicatorById])
+
+  // Calcula métricas do projeto de forma assíncrona
+  useEffect(() => {
+    const loadMetricas = async () => {
+      if (!project || completeIndicators.length === 0) {
+        setMetricas(null)
+        return
+      }
+      setMetricasLoading(true)
+      try {
+        const result = await calculateProjectROI(id)
+        setMetricas(result)
+      } catch (error) {
+        console.error('Erro ao calcular ROI:', error)
+        setMetricas(null)
+      } finally {
+        setMetricasLoading(false)
+      }
     }
-    try {
-      const result = calculateProjectROI(id)
-      return result
-    } catch (error) {
-      console.error('Erro ao calcular ROI:', error)
-      return null
+    loadMetricas()
+  }, [project, completeIndicators, id, calculateProjectROI])
+
+  // Calcula métricas específicas por tipo de indicador
+  const metricasPorTipo = useMemo(() => {
+    if (completeIndicators.length === 0) {
+      return {
+        produtividade: [],
+        incrementoReceita: [],
+        outros: []
+      }
     }
-  }, [project, indicators, id, calculateProjectROI])
+    return calcularMetricasPorTipo(completeIndicators)
+  }, [completeIndicators])
 
   const [correlations, setCorrelations] = useState(null)
   const [correlationsLoading, setCorrelationsLoading] = useState(false)
 
   useEffect(() => {
-    if (project && indicators.length > 0) {
+    if (project && completeIndicators.length > 0) {
       setCorrelationsLoading(true)
       const result = correlationService.calculateCorrelations(id)
       if (result.success) {
@@ -46,50 +116,7 @@ const Dashboard = () => {
       }
       setCorrelationsLoading(false)
     }
-  }, [project, indicators, id])
-
-  if (loading) {
-    return <Loading />
-  }
-
-  if (!project) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-400">Projeto não encontrado</p>
-      </div>
-    )
-  }
-
-  if (indicators.length === 0) {
-    return (
-      <Card>
-        <div className="text-center py-16">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <i className="fas fa-chart-line text-4xl text-blue-500 dark:text-blue-400"></i>
-          </div>
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-            Nenhum indicador encontrado
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            Adicione indicadores ao projeto para ver as métricas de ROI
-          </p>
-          <Button onClick={() => navigate(`/projects/${id}/indicators/new`)}>
-            <i className="fas fa-plus mr-2"></i>
-            Criar Primeiro Indicador
-          </Button>
-        </div>
-      </Card>
-    )
-  }
-
-  // Se não há indicadores, já retornou acima
-  if (indicators.length === 0) {
-    return null // Já foi tratado acima
-  }
-
-  if (!metricas) {
-    return <Loading />
-  }
+  }, [project, completeIndicators, id])
 
   // Dados para gráfico de evolução financeira
   const dadosEvolucao = useMemo(() => {
@@ -253,8 +280,75 @@ const Dashboard = () => {
     }
   }, [metricas])
 
+  // Retornos condicionais - APÓS todos os hooks
+  if (loading || indicatorsLoading || metricasLoading) {
+    return <Loading />
+  }
+
+  if (!project) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-400">Projeto não encontrado</p>
+      </div>
+    )
+  }
+
+  if (indicators.length === 0) {
+    return (
+      <Card>
+        <div className="text-center py-16">
+          <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="fas fa-chart-line text-4xl text-blue-500 dark:text-blue-400"></i>
+          </div>
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+            Nenhum indicador encontrado
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Adicione indicadores ao projeto para ver as métricas de ROI
+          </p>
+          <Button onClick={() => navigate(`/projects/${id}/indicators/new`)}>
+            <i className="fas fa-plus mr-2"></i>
+            Criar Primeiro Indicador
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
+  if (!metricas) {
+    return <Loading />
+  }
+
   return (
     <div>
+      {/* Gráficos Específicos por Tipo de Indicador */}
+      {metricasPorTipo.produtividade.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Produtividade
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise detalhada dos indicadores de produtividade
+            </p>
+          </div>
+          <ProdutividadeCharts metricas={metricasPorTipo.produtividade} />
+        </div>
+      )}
+
+      {metricasPorTipo.incrementoReceita.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Incremento de Receita
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise do delta de receita após implementação
+            </p>
+          </div>
+          <IncrementoReceitaCard metricas={metricasPorTipo.incrementoReceita} />
+        </div>
+      )}
 
       {/* Cards de KPI */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">

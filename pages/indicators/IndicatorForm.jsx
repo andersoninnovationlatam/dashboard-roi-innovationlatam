@@ -36,6 +36,7 @@ const IndicatorForm = () => {
     postIAData: null, // Dados estruturados de Pós-IA (JSONB)
     comIA: {
       precisaValidacao: false,
+      pessoaEnvolvida: false, // Novo campo: Alguém foi envolvido?
       pessoas: [],
       ias: []
     },
@@ -101,6 +102,7 @@ const IndicatorForm = () => {
               postIAData: finalPostIAData?.tipo ? finalPostIAData : null,
               comIA: {
                 precisaValidacao: finalIAData?.precisaValidacao || false,
+                pessoaEnvolvida: finalIAData?.pessoaEnvolvida || false,
                 pessoas: pessoasIA,
                 ias: finalIAData?.ias || []
               },
@@ -146,6 +148,7 @@ const IndicatorForm = () => {
               postIAData: postIADataStructured,
               comIA: {
                 precisaValidacao: iaData?.precisaValidacao || false,
+                pessoaEnvolvida: iaData?.pessoaEnvolvida || false,
                 pessoas: pessoasIA,
                 ias: iaData?.ias || []
               },
@@ -172,6 +175,7 @@ const IndicatorForm = () => {
             postIAData: null,
             comIA: {
               precisaValidacao: iaData?.precisaValidacao || false,
+              pessoaEnvolvida: iaData?.pessoaEnvolvida || false,
               pessoas: iaData?.pessoas || [],
               ias: iaData?.ias || []
             },
@@ -190,11 +194,12 @@ const IndicatorForm = () => {
           },
           baselineData: null,
           postIAData: null,
-          comIA: {
-            precisaValidacao: false,
-            pessoas: [],
-            ias: []
-          },
+        comIA: {
+          precisaValidacao: false,
+          pessoaEnvolvida: false,
+          pessoas: [],
+          ias: []
+        },
           custos: []
         })
       }
@@ -284,6 +289,7 @@ const IndicatorForm = () => {
       },
       comIA: {
         ...prev.comIA,
+        pessoaEnvolvida: false, // Reseta pessoaEnvolvida ao mudar tipo
         pessoas: prev.comIA.pessoas.map(limparCamposPessoa),
         ias: prev.comIA.ias.map(limparCamposIA)
       }
@@ -564,6 +570,7 @@ const IndicatorForm = () => {
       // IA data (mantém compatibilidade)
       const iaData = {
         precisaValidacao: formData.comIA.precisaValidacao,
+        pessoaEnvolvida: formData.comIA.pessoaEnvolvida || false,
         pessoas: formData.comIA.pessoas || [],
         ias: formData.comIA.ias || []
       }
@@ -778,7 +785,7 @@ const IndicatorForm = () => {
             </div>
           </Card>
 
-          {/* Tab 4: Custos */}
+          {/* Tab 5: Custos */}
           <Card borderColor="yellow-500">
             <div className="space-y-6">
               <div className="flex justify-between items-center mb-6">
