@@ -3,13 +3,20 @@
  * Gerencia login, registro e sessão do usuário usando Supabase Auth
  */
 
-import { supabase } from '../src/lib/supabase'
+import { supabase, isSupabaseConfigured } from '../src/lib/supabase'
 
 export const authServiceSupabase = {
   /**
    * Registra um novo usuário no Supabase
    */
   async register(nome, email, senha) {
+    if (!isSupabaseConfigured) {
+      return { 
+        success: false, 
+        error: 'Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env' 
+      }
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -47,6 +54,13 @@ export const authServiceSupabase = {
    * Faz login do usuário no Supabase
    */
   async login(email, senha) {
+    if (!isSupabaseConfigured) {
+      return { 
+        success: false, 
+        error: 'Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env' 
+      }
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -54,6 +68,14 @@ export const authServiceSupabase = {
       })
 
       if (error) {
+        // Tratamento específico para email não confirmado
+        if (error.message === 'Email not confirmed' || error.message.includes('email_not_confirmed')) {
+          return { 
+            success: false, 
+            error: 'Email não confirmado. Verifique sua caixa de entrada e clique no link de confirmação enviado por email. Se não recebeu, verifique a pasta de spam ou entre em contato com o suporte.',
+            requiresConfirmation: true
+          }
+        }
         return { success: false, error: error.message }
       }
 
@@ -79,6 +101,10 @@ export const authServiceSupabase = {
    * Faz logout do usuário
    */
   async logout() {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Supabase não está configurado' }
+    }
+
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {
@@ -95,6 +121,10 @@ export const authServiceSupabase = {
    * Verifica se há usuário logado
    */
   async isLoggedIn() {
+    if (!isSupabaseConfigured) {
+      return false
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       return !!session
@@ -108,6 +138,10 @@ export const authServiceSupabase = {
    * Retorna o usuário atual
    */
   async getCurrentUser() {
+    if (!isSupabaseConfigured) {
+      return null
+    }
+
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
 
@@ -131,6 +165,10 @@ export const authServiceSupabase = {
    * Retorna a sessão atual
    */
   async getSession() {
+    if (!isSupabaseConfigured) {
+      return null
+    }
+
     try {
       const { data: { session }, error } = await supabase.auth.getSession()
       if (error) {
@@ -148,6 +186,10 @@ export const authServiceSupabase = {
    * Escuta mudanças na autenticação
    */
   onAuthStateChange(callback) {
+    if (!isSupabaseConfigured) {
+      return { subscription: { unsubscribe: () => {} } }
+    }
+
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.user) {

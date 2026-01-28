@@ -4,23 +4,40 @@ import { useData } from '../../contexts/DataContext'
 import { exportService } from '../../services/exportService'
 import Loading from '../../components/common/Loading'
 import Button from '../../components/common/Button'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 
 const ProjectOverview = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { getProjectById, getIndicatorsByProjectId, calculateProjectROI, loading } = useData()
+  const { getProjectById, getIndicatorsByProjectId, calculateProjectROI, deleteProject, loading } = useData()
   
   const project = getProjectById(id)
-  const indicators = getIndicatorsByProjectId(id)
-  const metricas = project ? calculateProjectROI(id) : null
-
+  const [indicators, setIndicators] = useState([])
+  const [metricas, setMetricas] = useState(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [activeTab, setActiveTab] = useState(() => {
     if (location.pathname.includes('/dashboard')) return 0
     if (location.pathname.includes('/reports')) return 1
     if (location.pathname.includes('/indicators')) return 2
     return 0
   })
+
+  // Carrega indicadores e métricas de forma assíncrona
+  useEffect(() => {
+    const loadData = async () => {
+      if (id) {
+        const projectIndicators = await getIndicatorsByProjectId(id)
+        setIndicators(projectIndicators)
+        
+        if (project) {
+          const projectMetricas = await calculateProjectROI(id)
+          setMetricas(projectMetricas)
+        }
+      }
+    }
+    loadData()
+  }, [id, project, getIndicatorsByProjectId, calculateProjectROI])
 
   useEffect(() => {
     // Redireciona para dashboard se acessar a rota base do projeto
@@ -141,6 +158,14 @@ const ProjectOverview = () => {
               <i className="fas fa-edit mr-2"></i>
               Editar
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <i className="fas fa-trash mr-2"></i>
+              Excluir
+            </Button>
           </div>
         </div>
         
@@ -175,6 +200,26 @@ const ProjectOverview = () => {
         </div>
         <Outlet />
       </div>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        title="Excluir Projeto"
+        message="Tem certeza que deseja excluir este projeto? Esta ação não pode ser desfeita e todos os indicadores associados serão removidos."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+        onConfirm={async () => {
+          setShowDeleteDialog(false)
+          const result = await deleteProject(id)
+          if (result.success) {
+            navigate('/projects')
+          } else {
+            alert(`Erro ao excluir projeto: ${result.error || 'Erro desconhecido'}`)
+          }
+        }}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
     </div>
   )
 }

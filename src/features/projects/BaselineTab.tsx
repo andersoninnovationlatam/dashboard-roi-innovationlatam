@@ -39,10 +39,11 @@ export const BaselineTab = ({
   // Converte tipo antigo para novo tipo baseado no tipoIndicador recebido da aba INFO
   const tipoBaseline = TIPO_MAPPING[tipoIndicador] || 'PRODUTIVIDADE'
 
-  // Helper para formatar valor numérico (remove zero à esquerda)
+  // Helper para formatar valor numérico (permite zero mas remove zeros à esquerda)
   const formatNumberValue = (value: number): string => {
-    if (value === 0 || value === null || value === undefined) return ''
-    return value.toString()
+    if (value === null || value === undefined) return ''
+    if (value === 0) return '0'  // Permite zero
+    return value.toString().replace(/^0+/, '')  // Remove zeros à esquerda
   }
 
   const [data, setData] = useState<BaselineData>(() => {

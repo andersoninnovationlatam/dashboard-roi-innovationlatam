@@ -39,10 +39,11 @@ export const PostIATab = ({
 }: PostIATabProps) => {
   const tipoPostIA = TIPO_MAPPING[tipoIndicador] || 'PRODUTIVIDADE'
 
-  // Helper para formatar valor numérico (remove zero à esquerda)
+  // Helper para formatar valor numérico (permite zero mas remove zeros à esquerda)
   const formatNumberValue = (value: number): string => {
-    if (value === 0 || value === null || value === undefined) return ''
-    return value.toString()
+    if (value === null || value === undefined) return ''
+    if (value === 0) return '0'  // Permite zero
+    return value.toString().replace(/^0+/, '')  // Remove zeros à esquerda
   }
 
   // Inicializa dados herdando do Baseline
@@ -129,6 +130,7 @@ export const PostIATab = ({
 
   // Atualiza quando baselineData ou postIAData mudam
   useEffect(() => {
+    // Se já existe postIAData salvo, usa ele (não sobrescreve)
     if (postIAData) {
       setData(postIAData)
       return
@@ -141,37 +143,55 @@ export const PostIATab = ({
     // Só re-herda se o tipo do baseline corresponde ao tipo atual
     if (baselineData.tipo === novoTipo) {
       if (baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData) {
-        // Preserva valores já preenchidos se existirem
+        // Garante que TODAS as pessoas do baseline sejam herdadas
         setData(prevData => {
+          // Se já tem dados no Pós-IA, preserva valores preenchidos
           const pessoasExistentes = prevData.tipo === 'PRODUTIVIDADE' && 'pessoas' in prevData ? prevData.pessoas : []
+          
+          // Mapeia TODAS as pessoas do baseline
           const novasPessoas = baselineData.pessoas.map(p => {
             const existente = pessoasExistentes.find(pp => pp.id === p.id)
+            // Se já existe no Pós-IA, preserva os valores preenchidos
+            if (existente) {
+              return {
+                id: p.id,
+                nome: p.nome,
+                cargo: p.cargo,
+                valorHora: existente.valorHora ?? p.valorHora,
+                tempoGasto: existente.tempoGasto ?? p.tempoGasto,
+                frequenciaReal: existente.frequenciaReal ?? { ...p.frequenciaReal },
+                frequenciaDesejada: existente.frequenciaDesejada ?? { ...p.frequenciaDesejada }
+              }
+            }
+            // Se não existe, cria nova pessoa herdando do baseline
             return {
               id: p.id,
               nome: p.nome,
               cargo: p.cargo,
-              valorHora: existente?.valorHora ?? p.valorHora,
-              tempoGasto: existente?.tempoGasto ?? p.tempoGasto,
-              frequenciaReal: existente?.frequenciaReal ?? { ...p.frequenciaReal },
-              frequenciaDesejada: existente?.frequenciaDesejada ?? { ...p.frequenciaDesejada }
+              valorHora: p.valorHora,
+              tempoGasto: p.tempoGasto,
+              frequenciaReal: { ...p.frequenciaReal },
+              frequenciaDesejada: { ...p.frequenciaDesejada }
             }
           })
+          
           return {
             tipo: 'PRODUTIVIDADE',
-            pessoas: novasPessoas,
-            custoTotalPostIA: 0,
-            deltaProdutividade: 0
+            pessoas: novasPessoas, // Garante que todas as pessoas do baseline estão presentes
+            custoTotalPostIA: prevData.tipo === 'PRODUTIVIDADE' ? prevData.custoTotalPostIA : 0,
+            deltaProdutividade: prevData.tipo === 'PRODUTIVIDADE' ? prevData.deltaProdutividade : 0
           }
         })
       } else if (baselineData.tipo === 'INCREMENTO RECEITA' && 'valorReceitaAntes' in baselineData) {
         setData(prevData => ({
           tipo: 'INCREMENTO RECEITA',
           valorReceitaDepois: prevData.tipo === 'INCREMENTO RECEITA' ? prevData.valorReceitaDepois : baselineData.valorReceitaAntes,
-          deltaReceita: 0
+          deltaReceita: prevData.tipo === 'INCREMENTO RECEITA' ? prevData.deltaReceita : 0
         }))
       } else if (baselineData.tipo === 'CUSTOS RELACIONADOS' && 'ferramentas' in baselineData) {
         setData(prevData => {
           const ferramentasExistentes = prevData.tipo === 'CUSTOS RELACIONADOS' && 'ferramentas' in prevData ? prevData.ferramentas : []
+          // Mapeia TODAS as ferramentas do baseline
           const novasFerramentas = baselineData.ferramentas.map(f => {
             const existente = ferramentasExistentes.find(ff => ff.id === f.id)
             return {
@@ -184,8 +204,8 @@ export const PostIATab = ({
           })
           return {
             tipo: 'CUSTOS RELACIONADOS',
-            ferramentas: novasFerramentas,
-            custoTotalImplementacao: 0
+            ferramentas: novasFerramentas, // Garante que todas as ferramentas do baseline estão presentes
+            custoTotalImplementacao: prevData.tipo === 'CUSTOS RELACIONADOS' ? prevData.custoTotalImplementacao : 0
           }
         })
       } else if (baselineData.tipo === 'OUTROS' && 'nomeIndicador' in baselineData) {
@@ -193,7 +213,7 @@ export const PostIATab = ({
           tipo: 'OUTROS',
           nomeIndicador: baselineData.nomeIndicador,
           valorIndicadorDepois: prevData.tipo === 'OUTROS' ? prevData.valorIndicadorDepois : baselineData.valorIndicador,
-          deltaIndicador: 0
+          deltaIndicador: prevData.tipo === 'OUTROS' ? prevData.deltaIndicador : 0
         }))
       }
     }

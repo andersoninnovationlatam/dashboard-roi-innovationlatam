@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import Card from '../../components/common/Card'
@@ -10,9 +10,35 @@ const IndicatorList = () => {
   const { getProjectById, getIndicatorsByProjectId, loading } = useData()
   
   const project = getProjectById(id)
-  const indicators = getIndicatorsByProjectId(id)
+  const [indicators, setIndicators] = useState([])
+  const [indicatorsLoading, setIndicatorsLoading] = useState(true)
 
-  if (loading) {
+  // Carrega indicadores de forma assíncrona
+  useEffect(() => {
+    const loadIndicators = async () => {
+      if (!id) {
+        setIndicators([])
+        setIndicatorsLoading(false)
+        return
+      }
+
+      setIndicatorsLoading(true)
+      try {
+        const projectIndicators = await getIndicatorsByProjectId(id)
+        // Garante que sempre seja um array
+        setIndicators(Array.isArray(projectIndicators) ? projectIndicators : [])
+      } catch (error) {
+        console.error('Erro ao carregar indicadores:', error)
+        setIndicators([])
+      } finally {
+        setIndicatorsLoading(false)
+      }
+    }
+
+    loadIndicators()
+  }, [id, getIndicatorsByProjectId])
+
+  if (loading || indicatorsLoading) {
     return <Loading />
   }
 
@@ -65,39 +91,47 @@ const IndicatorList = () => {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {indicators.map((indicator) => (
-            <Link 
-              key={indicator.id}
-              to={`/projects/${id}/indicators/${indicator.id}/edit`}
-              className="block group"
-            >
-              <Card className="h-full hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-2 border-transparent hover:border-purple-500/50">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-1">
-                    {indicator.nome}
-                  </h3>
-                  {indicator.tipoIndicador && (
-                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg text-xs font-semibold flex-shrink-0 ml-2">
-                      {indicator.tipoIndicador}
-                    </span>
-                  )}
-                </div>
-                
-                {indicator.descricao && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
-                    {indicator.descricao}
-                  </p>
-                )}
+          {indicators.map((indicator) => {
+            // Extrai nome e tipoIndicador do info_data se necessário
+            const infoData = indicator.info_data || {}
+            const nome = indicator.nome || infoData.nome || 'Indicador sem nome'
+            const tipoIndicador = indicator.tipoIndicador || infoData.tipoIndicador
+            const descricao = indicator.descricao || infoData.descricao
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <span className="text-sm font-medium text-purple-600 dark:text-purple-400 group-hover:underline">
-                    Editar indicador
-                  </span>
-                  <i className="fas fa-arrow-right text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform"></i>
-                </div>
-              </Card>
-            </Link>
-          ))}
+            return (
+              <Link 
+                key={indicator.id}
+                to={`/projects/${id}/indicators/${indicator.id}/edit`}
+                className="block group"
+              >
+                <Card className="h-full hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-2 border-transparent hover:border-purple-500/50">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-1">
+                      {nome}
+                    </h3>
+                    {tipoIndicador && (
+                      <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg text-xs font-semibold flex-shrink-0 ml-2">
+                        {tipoIndicador}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {descricao && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
+                      {descricao}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <span className="text-sm font-medium text-purple-600 dark:text-purple-400 group-hover:underline">
+                      Editar indicador
+                    </span>
+                    <i className="fas fa-arrow-right text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform"></i>
+                  </div>
+                </Card>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

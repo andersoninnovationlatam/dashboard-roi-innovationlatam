@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { BaselineData } from '../types/baseline'
 
 interface UseBaselineOptions {
@@ -15,6 +15,10 @@ export const useBaseline = ({ indicatorId, onSuccess, onError }: UseBaselineOpti
   const saveBaseline = async (baselineData: BaselineData) => {
     if (!indicatorId) {
       throw new Error('indicatorId é obrigatório para salvar baseline')
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env')
     }
 
     setLoading(true)

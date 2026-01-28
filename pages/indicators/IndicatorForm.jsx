@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { indicatorServiceSupabase } from '../../services/indicatorServiceSupabase'
 import { indicatorDataService } from '../../services/indicatorDataService'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
@@ -16,7 +18,8 @@ import { TIPOS_INDICADOR, CAMPOS_POR_TIPO } from '../../config/indicatorTypes'
 const IndicatorForm = () => {
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
-  const { getProjectById, getIndicatorById, createIndicator, updateIndicator } = useData()
+  const { getProjectById, getIndicatorById } = useData()
+  const { user } = useAuth()
   
   const project = getProjectById(id)
   const isEditing = !!indicatorId
@@ -45,84 +48,159 @@ const IndicatorForm = () => {
   const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
-    // Só carrega dados quando indicatorId muda (não inclui dataLoaded nas dependências para evitar loop)
-    if (isEditing && indicatorId) {
-      // Carrega dados de todas as abas usando o novo serviço
-      const infoData = indicatorDataService.getInfo(indicatorId)
-      const baselineData = indicatorDataService.getBaseline(indicatorId)
-      const iaData = indicatorDataService.getIA(indicatorId)
-      const custosData = indicatorDataService.getCustos(indicatorId)
-      
-      // Normaliza pessoas do baseline para incluir periodoOperacoesTotal
-      const pessoasBaseline = (baselineData?.pessoas || []).map(pessoa => ({
-        ...pessoa,
-        periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
-      }))
-      
-      // Normaliza pessoas da IA para incluir periodoOperacoesTotal
-      const pessoasIA = (iaData?.pessoas || []).map(pessoa => ({
-        ...pessoa,
-        periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
-      }))
-      
-      // Tenta carregar baselineData estruturado do localStorage
-      let baselineDataStructured = null
-      try {
-        if (baselineData && typeof baselineData === 'object' && 'baselineData' in baselineData) {
-          baselineDataStructured = baselineData.baselineData
-        }
-      } catch (e) {
-        // Se não conseguir parsear, mantém null
-      }
+    // Carrega dados do Supabase quando está editando
+    const loadIndicatorData = async () => {
+      if (isEditing && indicatorId) {
+        try {
+          const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
+          
+          if (completeIndicator) {
+            // Carrega dados do Supabase
+            const infoData = completeIndicator.nome ? {
+              nome: completeIndicator.nome,
+              tipoIndicador: completeIndicator.tipoIndicador,
+              descricao: completeIndicator.descricao,
+              camposEspecificos: completeIndicator.camposEspecificos
+            } : null
 
-      // Tenta carregar postIAData estruturado do localStorage
-      let postIADataStructured = null
-      try {
-        const postIADataRaw = indicatorDataService.getPostIA(indicatorId)
-        if (postIADataRaw && typeof postIADataRaw === 'object' && 'postIAData' in postIADataRaw) {
-          postIADataStructured = postIADataRaw.postIAData
+            // Tenta carregar do localStorage como fallback
+            const localStorageInfo = indicatorDataService.getInfo(indicatorId)
+            const localStorageBaseline = indicatorDataService.getBaseline(indicatorId)
+            const localStorageIA = indicatorDataService.getIA(indicatorId)
+            const localStorageCustos = indicatorDataService.getCustos(indicatorId)
+            const localStoragePostIA = indicatorDataService.getPostIA(indicatorId)
+
+            // Usa dados do Supabase se disponíveis, senão usa localStorage
+            const finalInfoData = infoData || localStorageInfo
+            const finalBaselineData = completeIndicator.baselineData || (localStorageBaseline?.baselineData || localStorageBaseline)
+            const finalIAData = completeIndicator.ia || localStorageIA
+            const finalCustosData = completeIndicator.custos || localStorageCustos?.custos || []
+            const finalPostIAData = completeIndicator.postIAData || (localStoragePostIA?.postIAData || null)
+
+            // Normaliza pessoas do baseline para compatibilidade
+            const pessoasBaseline = (finalBaselineData?.pessoas || []).map(pessoa => ({
+              ...pessoa,
+              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
+            }))
+
+            // Normaliza pessoas da IA
+            const pessoasIA = (finalIAData?.pessoas || []).map(pessoa => ({
+              ...pessoa,
+              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
+            }))
+
+            setFormData({
+              nome: finalInfoData?.nome || '',
+              tipoIndicador: finalInfoData?.tipoIndicador || 'Produtividade',
+              descricao: finalInfoData?.descricao || '',
+              camposEspecificos: finalInfoData?.camposEspecificos || {},
+              baseline: {
+                pessoas: pessoasBaseline
+              },
+              baselineData: finalBaselineData?.tipo ? finalBaselineData : null,
+              postIAData: finalPostIAData?.tipo ? finalPostIAData : null,
+              comIA: {
+                precisaValidacao: finalIAData?.precisaValidacao || false,
+                pessoas: pessoasIA,
+                ias: finalIAData?.ias || []
+              },
+              custos: finalCustosData
+            })
+          } else {
+            // Fallback para localStorage se não encontrar no Supabase
+            const infoData = indicatorDataService.getInfo(indicatorId)
+            const baselineData = indicatorDataService.getBaseline(indicatorId)
+            const iaData = indicatorDataService.getIA(indicatorId)
+            const custosData = indicatorDataService.getCustos(indicatorId)
+            const postIADataRaw = indicatorDataService.getPostIA(indicatorId)
+
+            const pessoasBaseline = (baselineData?.pessoas || []).map(pessoa => ({
+              ...pessoa,
+              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
+            }))
+
+            const pessoasIA = (iaData?.pessoas || []).map(pessoa => ({
+              ...pessoa,
+              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
+            }))
+
+            let baselineDataStructured = null
+            if (baselineData && typeof baselineData === 'object' && 'baselineData' in baselineData) {
+              baselineDataStructured = baselineData.baselineData
+            }
+
+            let postIADataStructured = null
+            if (postIADataRaw && typeof postIADataRaw === 'object' && 'postIAData' in postIADataRaw) {
+              postIADataStructured = postIADataRaw.postIAData
+            }
+
+            setFormData({
+              nome: infoData?.nome || '',
+              tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
+              descricao: infoData?.descricao || '',
+              camposEspecificos: infoData?.camposEspecificos || {},
+              baseline: {
+                pessoas: pessoasBaseline
+              },
+              baselineData: baselineDataStructured,
+              postIAData: postIADataStructured,
+              comIA: {
+                precisaValidacao: iaData?.precisaValidacao || false,
+                pessoas: pessoasIA,
+                ias: iaData?.ias || []
+              },
+              custos: custosData?.custos || []
+            })
+          }
+        } catch (error) {
+          console.error('Erro ao carregar indicador:', error)
+          // Em caso de erro, tenta carregar do localStorage
+          const infoData = indicatorDataService.getInfo(indicatorId)
+          const baselineData = indicatorDataService.getBaseline(indicatorId)
+          const iaData = indicatorDataService.getIA(indicatorId)
+          const custosData = indicatorDataService.getCustos(indicatorId)
+
+          setFormData({
+            nome: infoData?.nome || '',
+            tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
+            descricao: infoData?.descricao || '',
+            camposEspecificos: infoData?.camposEspecificos || {},
+            baseline: {
+              pessoas: baselineData?.pessoas || []
+            },
+            baselineData: baselineData?.baselineData || null,
+            postIAData: null,
+            comIA: {
+              precisaValidacao: iaData?.precisaValidacao || false,
+              pessoas: iaData?.pessoas || [],
+              ias: iaData?.ias || []
+            },
+            custos: custosData?.custos || []
+          })
         }
-      } catch (e) {
-        // Se não conseguir parsear, mantém null
+      } else if (!isEditing) {
+        // Se não está editando, reseta o formData
+        setFormData({
+          nome: '',
+          tipoIndicador: 'Produtividade',
+          descricao: '',
+          camposEspecificos: {},
+          baseline: {
+            pessoas: []
+          },
+          baselineData: null,
+          postIAData: null,
+          comIA: {
+            precisaValidacao: false,
+            pessoas: [],
+            ias: []
+          },
+          custos: []
+        })
       }
-      
-      setFormData({
-        nome: infoData?.nome || '',
-        tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
-        descricao: infoData?.descricao || '',
-        camposEspecificos: infoData?.camposEspecificos || {},
-        baseline: {
-          pessoas: pessoasBaseline
-        },
-        baselineData: baselineDataStructured,
-        postIAData: postIADataStructured,
-        comIA: {
-          precisaValidacao: iaData?.precisaValidacao || false,
-          pessoas: pessoasIA,
-          ias: iaData?.ias || []
-        },
-        custos: custosData?.custos || []
-      })
-    } else if (!isEditing) {
-      // Se não está editando, reseta o formData
-      setFormData({
-        nome: '',
-        tipoIndicador: 'Produtividade',
-        descricao: '',
-        camposEspecificos: {},
-        baseline: {
-          pessoas: []
-        },
-        baselineData: null,
-        postIAData: null,
-        comIA: {
-          precisaValidacao: false,
-          pessoas: [],
-          ias: []
-        },
-        custos: []
-      })
     }
+
+    loadIndicatorData()
   }, [indicatorId, isEditing]) // Só depende de indicatorId e isEditing
 
   const handleChange = (section, field, value) => {
@@ -421,6 +499,30 @@ const IndicatorForm = () => {
     }))
   }
 
+  // Calcula o total de custos
+  const calcularTotalCustos = () => {
+    return formData.custos.reduce((total, custo) => {
+      const valor = parseFloat(custo.valor) || 0
+      // Se for anual, converte para mensal para exibição (divide por 12)
+      // Mas pode ser útil mostrar ambos: total mensal e total anual
+      if (custo.tipo === 'anual') {
+        return total + (valor / 12) // Converte anual para mensal para comparação
+      }
+      return total + valor
+    }, 0)
+  }
+
+  // Calcula total anual de custos
+  const calcularTotalCustosAnual = () => {
+    return formData.custos.reduce((total, custo) => {
+      const valor = parseFloat(custo.valor) || 0
+      if (custo.tipo === 'mensal') {
+        return total + (valor * 12) // Converte mensal para anual
+      }
+      return total + valor
+    }, 0)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -432,54 +534,100 @@ const IndicatorForm = () => {
       return
     }
 
+    if (!user?.id) {
+      setError('Usuário não autenticado')
+      setLoading(false)
+      return
+    }
+
     try {
       let indicatorIdToUse = indicatorId
 
-      // Se é novo indicador, cria metadados primeiro
-      if (!isEditing) {
-        const createResult = await createIndicator({ projetoId: id })
+      // Valida se o ID é UUID válido (se não for, trata como novo indicador)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      const isValidUUID = indicatorId && uuidRegex.test(indicatorId)
+      const shouldCreateNew = !isEditing || !isValidUUID
+
+      // Preparar dados para salvar no Supabase
+      const infoData = {
+        nome: formData.nome,
+        tipoIndicador: formData.tipoIndicador,
+        descricao: formData.descricao,
+        camposEspecificos: formData.camposEspecificos
+      }
+
+      // Baseline data - prioriza baselineData estruturado
+      const baselineDataToSave = formData.baselineData || (formData.baseline?.pessoas?.length > 0 ? {
+        pessoas: formData.baseline.pessoas
+      } : {})
+
+      // IA data (mantém compatibilidade)
+      const iaData = {
+        precisaValidacao: formData.comIA.precisaValidacao,
+        pessoas: formData.comIA.pessoas || [],
+        ias: formData.comIA.ias || []
+      }
+
+      // Custos data
+      const custosData = {
+        custos: formData.custos || []
+      }
+
+      // Post-IA data
+      const postIADataToSave = formData.postIAData || {}
+
+      // Se é novo indicador ou ID inválido, cria no Supabase
+      if (shouldCreateNew) {
+        const createResult = await indicatorServiceSupabase.create({
+          projectId: id,
+          info_data: infoData,
+          baseline_data: baselineDataToSave,
+          ia_data: iaData,
+          custos_data: custosData,
+          post_ia_data: postIADataToSave
+        })
+
         if (!createResult.success) {
           setError(createResult.error || 'Erro ao criar indicador')
           setLoading(false)
           return
         }
         indicatorIdToUse = createResult.indicator.id
+        
+        // Se estava editando mas o ID era inválido, mostra mensagem informativa
+        if (isEditing && !isValidUUID) {
+          console.warn('Indicador com ID inválido foi recriado no Supabase com novo UUID')
+        }
       } else {
-        // Atualiza metadados se necessário
-        await updateIndicator(indicatorId, { projetoId: id })
+        // Atualiza indicador existente no Supabase (só se ID for UUID válido)
+        const updateResult = await indicatorServiceSupabase.update(indicatorId, {
+          info_data: infoData,
+          baseline_data: baselineDataToSave,
+          ia_data: iaData,
+          custos_data: custosData,
+          post_ia_data: postIADataToSave
+        })
+
+        if (!updateResult.success) {
+          setError(updateResult.error || 'Erro ao atualizar indicador')
+          setLoading(false)
+          return
+        }
       }
 
-      // Salva dados em arquivos separados por aba
-      indicatorDataService.saveInfo(indicatorIdToUse, {
-        nome: formData.nome,
-        tipoIndicador: formData.tipoIndicador,
-        descricao: formData.descricao,
-        camposEspecificos: formData.camposEspecificos
-      })
-
-      // Salva baseline - prioriza baselineData estruturado se existir
+      // Também salva no localStorage para compatibilidade durante transição
+      indicatorDataService.saveInfo(indicatorIdToUse, infoData)
       if (formData.baselineData) {
         indicatorDataService.saveBaseline(indicatorIdToUse, {
           baselineData: formData.baselineData
         })
-      } else {
-        // Fallback para formato legado (se não houver baselineData estruturado)
+      } else if (formData.baseline?.pessoas?.length > 0) {
         indicatorDataService.saveBaseline(indicatorIdToUse, {
           pessoas: formData.baseline.pessoas
         })
       }
-
-      indicatorDataService.saveIA(indicatorIdToUse, {
-        precisaValidacao: formData.comIA.precisaValidacao,
-        pessoas: formData.comIA.pessoas,
-        ias: formData.comIA.ias
-      })
-
-      indicatorDataService.saveCustos(indicatorIdToUse, {
-        custos: formData.custos
-      })
-
-      // Salva Pós-IA se existir
+      indicatorDataService.saveIA(indicatorIdToUse, iaData)
+      indicatorDataService.saveCustos(indicatorIdToUse, custosData)
       if (formData.postIAData) {
         indicatorDataService.savePostIA(indicatorIdToUse, {
           postIAData: formData.postIAData
@@ -488,6 +636,7 @@ const IndicatorForm = () => {
 
       navigate(`/projects/${id}/indicators`)
     } catch (error) {
+      console.error('Erro ao salvar indicador:', error)
       setError(error.message || 'Erro ao salvar indicador')
     }
 
@@ -497,7 +646,7 @@ const IndicatorForm = () => {
   const tabs = [
     { title: 'Info', icon: 'fas fa-info-circle' },
     { title: 'Baseline', icon: 'fas fa-user-clock' },
-    { title: 'IA', icon: 'fas fa-robot' },
+    { title: 'Pós-IA', icon: 'fas fa-chart-line' },
     { title: 'Custos', icon: 'fas fa-coins' }
   ]
 
@@ -661,17 +810,37 @@ const IndicatorForm = () => {
                   <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">Clique em "Adicionar Custo" para começar</p>
                 </div>
               ) : (
-            <div className="space-y-4">
-                  {formData.custos.map((custo, index) => (
-                    <CustoForm
-                      key={index}
-                      custo={custo}
-                      index={index}
-                      onUpdate={(field, value) => updateCusto(index, field, value)}
-                      onRemove={() => removeCusto(index)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-4">
+                    {formData.custos.map((custo, index) => (
+                      <CustoForm
+                        key={index}
+                        custo={custo}
+                        index={index}
+                        onUpdate={(field, value) => updateCusto(index, field, value)}
+                        onRemove={() => removeCusto(index)}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Total de Custos */}
+                  <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Mensal</p>
+                        <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                          R$ {calcularTotalCustos().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
+                        <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                          R$ {calcularTotalCustosAnual().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </Card>

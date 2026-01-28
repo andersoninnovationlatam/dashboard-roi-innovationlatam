@@ -19,14 +19,19 @@ const ProjectForm = () => {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (isEditing && id) {
-      const project = getProjectById(id)
-      if (project) {
-        setName(project.name || project.nome || '')
-        setDepartment(project.department || project.area || '')
-        setDescription(project.description || project.descricao || '')
+    const loadProject = async () => {
+      if (isEditing && id) {
+        // Aguarda um pouco para garantir que os projetos foram carregados
+        await new Promise(resolve => setTimeout(resolve, 100))
+        const project = getProjectById(id)
+        if (project) {
+          setName(project.name || project.nome || '')
+          setDepartment(project.department || project.area || '')
+          setDescription(project.description || project.descricao || '')
+        }
       }
     }
+    loadProject()
   }, [id, isEditing, getProjectById])
 
   const handleSubmit = async (e) => {

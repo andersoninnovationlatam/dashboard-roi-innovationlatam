@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { supabase } from '../../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { CreateProjectInput } from '../../types'
 
@@ -69,6 +69,10 @@ export const CreateProjectForm = ({ onSuccess, onCancel }: CreateProjectFormProp
   })
 
   const onSubmit = async (data: CreateProjectFormData) => {
+    if (!isSupabaseConfigured || !supabase) {
+      alert('Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env')
+      return
+    }
 
     try {
       const projectData: CreateProjectInput = {
