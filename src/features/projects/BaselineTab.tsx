@@ -300,10 +300,11 @@ export const BaselineTab = ({
       const updatedPessoas = [...data.pessoas]
       if (field.includes('.')) {
         const [parent, child] = field.split('.')
+        const currentValue = updatedPessoas[index][parent as keyof ProdutividadePerson]
         updatedPessoas[index] = {
           ...updatedPessoas[index],
           [parent]: {
-            ...updatedPessoas[index][parent as keyof ProdutividadePerson],
+            ...(typeof currentValue === 'object' && currentValue !== null ? currentValue : {}),
             [child]: value
           }
         } as ProdutividadePerson
@@ -404,60 +405,6 @@ export const BaselineTab = ({
     }
   }
 
-  // Funções para QUALIDADE DECISÃO
-  const addCriterio = () => {
-    if (data.tipo === 'QUALIDADE DECISÃO' && 'criterios' in data) {
-      const novoCriterio = {
-        id: Date.now().toString(),
-        nome: '',
-        avaliacao: 0
-      }
-      const updatedCriterios = [...data.criterios, novoCriterio]
-      const scoreMedio = updatedCriterios.length > 0
-        ? updatedCriterios.reduce((sum, c) => sum + c.avaliacao, 0) / updatedCriterios.length
-        : 0
-      const updatedData: BaselineData = {
-        ...data,
-        criterios: updatedCriterios,
-        scoreMedio
-      }
-      updateData(updatedData)
-    }
-  }
-
-  const removeCriterio = (index: number) => {
-    if (data.tipo === 'QUALIDADE DECISÃO' && 'criterios' in data) {
-      const updatedCriterios = data.criterios.filter((_, i) => i !== index)
-      const scoreMedio = updatedCriterios.length > 0
-        ? updatedCriterios.reduce((sum, c) => sum + c.avaliacao, 0) / updatedCriterios.length
-        : 0
-      const updatedData: BaselineData = {
-        ...data,
-        criterios: updatedCriterios,
-        scoreMedio
-      }
-      updateData(updatedData)
-    }
-  }
-
-  const updateCriterio = (index: number, field: string, value: any) => {
-    if (data.tipo === 'QUALIDADE DECISÃO' && 'criterios' in data) {
-      const updatedCriterios = [...data.criterios]
-      updatedCriterios[index] = {
-        ...updatedCriterios[index],
-        [field]: value
-      }
-      const scoreMedio = updatedCriterios.length > 0
-        ? updatedCriterios.reduce((sum, c) => sum + c.avaliacao, 0) / updatedCriterios.length
-        : 0
-      const updatedData: BaselineData = {
-        ...data,
-        criterios: updatedCriterios,
-        scoreMedio
-      }
-      updateData(updatedData)
-    }
-  }
 
   return (
     <Tooltip.Provider>

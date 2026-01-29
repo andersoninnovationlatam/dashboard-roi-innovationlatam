@@ -80,6 +80,80 @@ export const PostIATab = ({
           })),
           custoTotalImplementacao: 0
         }
+      } else if (baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData) {
+        // Herda dados do Baseline para Capacidade Analítica
+        return {
+          tipo: 'CAPACIDADE ANALÍTICA',
+          camposQualitativos: baselineData.camposQualitativos.map(campo => ({
+            id: campo.id,
+            criterio: campo.criterio,
+            valor: campo.valor
+          }))
+        }
+      } else if (baselineData.tipo === 'MELHORIA MARGEM' && 'receitaBrutaMensal' in baselineData) {
+        // Herda dados do Baseline para Melhoria Margem
+        return {
+          tipo: 'MELHORIA MARGEM',
+          receitaBrutaMensalEstimada: baselineData.receitaBrutaMensal,
+          custoTotalMensalEstimado: baselineData.custoTotalMensal,
+          margemBrutaEstimada: baselineData.margemBrutaAtual,
+          volumeTransacoesEstimado: baselineData.volumeTransacoes,
+          deltaMargem: 0,
+          deltaMargemReais: 0,
+          economiaMensal: 0,
+          economiaAnual: 0
+        }
+      } else if (baselineData.tipo === 'REDUÇÃO DE RISCO' && 'tipoRisco' in baselineData) {
+        // Herda dados do Baseline para Redução de Risco
+        return {
+          tipo: 'REDUÇÃO DE RISCO',
+          probabilidadeComIA: baselineData.probabilidadeAtual,
+          impactoFinanceiroReduzido: baselineData.impactoFinanceiro,
+          frequenciaAvaliacaoComIA: baselineData.frequenciaAvaliacao,
+          periodoAvaliacaoComIA: baselineData.periodoAvaliacao, // Herda do Baseline
+          custoMitigacaoComIA: baselineData.custoMitigacaoAtual,
+          reducaoProbabilidade: 0,
+          valorRiscoEvitado: 0,
+          economiaMitigacao: 0,
+          beneficioAnual: 0,
+          custoVsBeneficio: 0,
+          roiReducaoRisco: 0
+        }
+      } else if (baselineData.tipo === 'QUALIDADE DECISÃO' && 'numeroDecisoesPeriodo' in baselineData) {
+        // Herda dados do Baseline para Qualidade Decisão
+        return {
+          tipo: 'QUALIDADE DECISÃO',
+          numeroDecisoesPeriodoComIA: baselineData.numeroDecisoesPeriodo,
+          periodoComIA: baselineData.periodo, // Herda do Baseline
+          taxaAcertoComIA: baselineData.taxaAcertoAtual,
+          custoMedioDecisaoErradaComIA: baselineData.custoMedioDecisaoErrada,
+          tempoMedioDecisaoComIA: baselineData.tempoMedioDecisao,
+          pessoasEnvolvidasComIA: baselineData.pessoasEnvolvidas,
+          melhoriaTaxaAcerto: 0,
+          economiaErrosEvitados: 0,
+          economiaTempo: 0,
+          valorTempoEconomizado: 0,
+          beneficioTotalMensal: 0,
+          roiMelhoria: 0
+        }
+      } else if (baselineData.tipo === 'VELOCIDADE' && 'tempoMedioEntregaAtual' in baselineData) {
+        // Herda dados do Baseline para Velocidade
+        return {
+          tipo: 'VELOCIDADE',
+          tempoMedioEntregaComIA: baselineData.tempoMedioEntregaAtual,
+          unidadeTempoEntregaComIA: baselineData.unidadeTempoEntrega, // Herda do Baseline
+          numeroEntregasPeriodoComIA: baselineData.numeroEntregasPeriodo,
+          periodoEntregasComIA: baselineData.periodoEntregas, // Herda do Baseline
+          custoPorAtrasoReduzido: baselineData.custoPorAtraso,
+          pessoasEnvolvidasComIA: baselineData.pessoasEnvolvidas,
+          tempoTrabalhoPorEntregaComIA: baselineData.tempoTrabalhoPorEntrega,
+          reducaoTempoEntrega: 0,
+          aumentoCapacidade: 0,
+          economiaAtrasos: 0,
+          valorTempoEconomizado: 0,
+          ganhoProdutividade: 0,
+          roiVelocidade: 0
+        }
       } else if (baselineData.tipo === 'SATISFAÇÃO' && 'tipoScore' in baselineData) {
         // Herda dados do Baseline para Satisfação
         return {
@@ -811,6 +885,49 @@ export const PostIATab = ({
         ...data,
         ferramentas: updatedFerramentas,
         custoTotalImplementacao: custoTotal
+      }
+      updateData(updatedData)
+    }
+  }
+
+  // Funções para CAPACIDADE ANALÍTICA
+  const addCampoQualitativo = () => {
+    if (data.tipo === 'CAPACIDADE ANALÍTICA') {
+      const novoCampo = {
+        id: `campo-${Date.now()}`,
+        criterio: '',
+        valor: ''
+      }
+      const updatedData: PostIAData = {
+        ...data,
+        camposQualitativos: [...data.camposQualitativos, novoCampo]
+      }
+      updateData(updatedData)
+    }
+  }
+
+  const removeCampoQualitativo = (index: number) => {
+    if (data.tipo === 'CAPACIDADE ANALÍTICA') {
+      const updatedCampos = data.camposQualitativos.filter((_, i) => i !== index)
+      const updatedData: PostIAData = {
+        ...data,
+        camposQualitativos: updatedCampos
+      }
+      updateData(updatedData)
+    }
+  }
+
+  const updateCampoQualitativo = (index: number, field: string, value: any) => {
+    if (data.tipo === 'CAPACIDADE ANALÍTICA') {
+      const updatedCampos = data.camposQualitativos.map((campo, i) => {
+        if (i === index) {
+          return { ...campo, [field]: value }
+        }
+        return campo
+      })
+      const updatedData: PostIAData = {
+        ...data,
+        camposQualitativos: updatedCampos
       }
       updateData(updatedData)
     }
@@ -2558,6 +2675,148 @@ export const PostIATab = ({
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CAPACIDADE ANALÍTICA */}
+      {tipoPostIA === 'CAPACIDADE ANALÍTICA' && data.tipo === 'CAPACIDADE ANALÍTICA' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Capacidade Analítica - Pós IA
+              </h3>
+              <button
+                type="button"
+                onClick={addCampoQualitativo}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar Critério
+              </button>
+            </div>
+
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                <strong>Baseline:</strong> {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData ? baselineData.camposQualitativos.length : 0} critério(s) definido(s)
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Documente os novos insights, análises ou capacidades analíticas geradas pela IA que não eram possíveis antes.
+              </p>
+            </div>
+
+            {data.camposQualitativos.length === 0 ? (
+              <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-8">
+                Nenhum critério adicionado. Clique em "Adicionar Critério" para começar.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {data.camposQualitativos.map((campo, index) => (
+                  <div
+                    key={campo.id}
+                    className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-medium text-slate-900 dark:text-white">
+                        Critério {index + 1}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => removeCampoQualitativo(index)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                          Critério / Insight
+                        </label>
+                        <input
+                          type="text"
+                          value={campo.criterio}
+                          onChange={(e) => updateCampoQualitativo(index, 'criterio', e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          placeholder="Ex: Previsão de demanda por região"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                          Descrição / Valor Gerado
+                        </label>
+                        <textarea
+                          value={campo.valor}
+                          onChange={(e) => updateCampoQualitativo(index, 'valor', e.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                          placeholder="Descreva o insight ou capacidade analítica gerada pela IA..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Comparativo com Baseline */}
+            {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData && baselineData.camposQualitativos.length > 0 && (
+              <div className="mt-6 p-4 bg-slate-100 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-600 rounded-lg">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                  Referência - Baseline
+                </h4>
+                <div className="space-y-2">
+                  {baselineData.camposQualitativos.map((campo, idx) => (
+                    <div key={campo.id} className="text-sm">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {idx + 1}. {campo.criterio}:
+                      </span>
+                      <span className="text-slate-600 dark:text-slate-400 ml-2">
+                        {campo.valor}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card de Métricas Calculadas */}
+          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-5 shadow-sm">
+            <h4 className="font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+              Resumo - Capacidade Analítica
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Critérios no Baseline
+                </p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData ? baselineData.camposQualitativos.length : 0}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Novos Critérios (Pós-IA)
+                </p>
+                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {data.camposQualitativos.length}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                Aumento na Capacidade
+              </p>
+              <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData 
+                  ? `+${data.camposQualitativos.length - baselineData.camposQualitativos.length} novos insights`
+                  : `${data.camposQualitativos.length} insights`}
+              </p>
             </div>
           </div>
         </div>

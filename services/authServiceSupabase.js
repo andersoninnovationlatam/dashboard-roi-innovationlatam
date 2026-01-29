@@ -76,6 +76,23 @@ export const authServiceSupabase = {
             requiresConfirmation: true
           }
         }
+        
+        // Tratamento para credenciais inválidas
+        if (error.message === 'Invalid login credentials' || error.message.includes('invalid')) {
+          return {
+            success: false,
+            error: 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.'
+          }
+        }
+        
+        // Tratamento para usuário não encontrado
+        if (error.message.includes('not found') || error.message.includes('does not exist')) {
+          return {
+            success: false,
+            error: 'Usuário não encontrado. Verifique se você já se registrou.'
+          }
+        }
+        
         return { success: false, error: error.message }
       }
 
@@ -107,10 +124,37 @@ export const authServiceSupabase = {
 
     try {
       const { error } = await supabase.auth.signOut()
+      
+      // Limpeza adicional de cache local
+      if (typeof window !== 'undefined') {
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.includes('supabase') || key.includes('sb-'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key)
+          } catch (e) {
+            console.warn('Erro ao remover chave:', key, e)
+          }
+        })
+        
+        try {
+          sessionStorage.clear()
+        } catch (e) {
+          console.warn('Erro ao limpar sessionStorage:', e)
+        }
+      }
+      
       if (error) {
         console.error('Erro ao fazer logout:', error)
+        return { success: false, error: error.message }
       }
-      return { success: !error }
+      
+      return { success: true }
     } catch (error) {
       console.error('Erro ao fazer logout:', error)
       return { success: false, error: error.message }
@@ -135,7 +179,7 @@ export const authServiceSupabase = {
   },
 
   /**
-   * Retorna o usuário atual
+   * Retorna o usuário atual com validação no servidor
    */
   async getCurrentUser() {
     if (!isSupabaseConfigured) {
@@ -143,12 +187,32 @@ export const authServiceSupabase = {
     }
 
     try {
-      const { data: { user }, error } = await supabase.auth.getUser()
-
-      if (error || !user) {
+      // Passo 1: Verifica se existe sessão local
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
         return null
       }
 
+      // Passo 2: CRÍTICO - Força refresh para validar com servidor
+      // Isso garante que usuários deletados sejam deslogados
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+
+      if (refreshError) {
+        console.warn('Sessão inválida detectada:', refreshError.message)
+        // Limpa sessão corrompida
+        await supabase.auth.signOut()
+        return null
+      }
+
+      const user = refreshData?.user
+      if (!user) {
+        console.warn('Usuário não existe mais no servidor')
+        await supabase.auth.signOut()
+        return null
+      }
+
+      // Passo 3: Retorna dados validados
       return {
         id: user.id,
         email: user.email,
@@ -157,6 +221,12 @@ export const authServiceSupabase = {
       }
     } catch (error) {
       console.error('Erro ao obter usuário:', error)
+      // Em caso de erro, limpa a sessão por segurança
+      try {
+        await supabase.auth.signOut()
+      } catch (e) {
+        console.error('Erro ao fazer logout de segurança:', e)
+      }
       return null
     }
   },

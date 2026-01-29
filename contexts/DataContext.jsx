@@ -3,11 +3,12 @@ import { projectServiceSupabase } from '../services/projectServiceSupabase'
 import { indicatorServiceSupabase } from '../services/indicatorServiceSupabase'
 import { calcularROIIndicador, calcularROIProjeto } from '../services/roiCalculatorService'
 import { useAuth } from './AuthContext'
+import { supabase } from '../src/lib/supabase'
 
 const DataContext = createContext(null)
 
 export const DataProvider = ({ children }) => {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [projects, setProjects] = useState([])
   const [indicators, setIndicators] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +23,22 @@ export const DataProvider = ({ children }) => {
 
     setLoading(true)
     try {
+      // CRÍTICO: Valida sessão antes de carregar dados
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
+        console.warn('🔒 Sessão inválida detectada ao carregar dados')
+        setProjects([])
+        setIndicators([])
+        setLoading(false)
+        // Força logout por segurança
+        if (logout) {
+          console.warn('🚪 Fazendo logout devido a sessão inválida')
+          await logout()
+        }
+        return
+      }
+
       // Carrega projetos do Supabase
       const projectsData = await projectServiceSupabase.getAll(user.id)
       setProjects(projectsData || [])
@@ -31,22 +48,66 @@ export const DataProvider = ({ children }) => {
       setIndicators(indicatorsData || [])
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
-      setProjects([])
-      setIndicators([])
+      
+      // Se erro de autenticação, limpa tudo e faz logout
+      const errorMsg = error.message?.toLowerCase() || ''
+      if (
+        errorMsg.includes('jwt') ||
+        errorMsg.includes('invalid') ||
+        errorMsg.includes('expired') ||
+        errorMsg.includes('unauthorized') ||
+        errorMsg === 'invalid_session' ||
+        errorMsg === 'token_expired' ||
+        errorMsg === 'auth_error'
+      ) {
+        console.error('🔒 Erro de autenticação detectado ao carregar dados, fazendo logout')
+        setProjects([])
+        setIndicators([])
+        if (logout) {
+          await logout()
+        }
+      } else {
+        setProjects([])
+        setIndicators([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, logout])
 
+  // CRÍTICO: Revalida dados e sessão periodicamente
   useEffect(() => {
-    if (user?.id) {
-      loadData()
-    } else {
+    if (!user?.id) {
+      setProjects([])
+      setIndicators([])
       setLoading(false)
+      return
+    }
+
+    // Primeira carga
+    loadData()
+
+    // Revalida a cada 30 segundos
+    const intervalId = setInterval(() => {
+      console.log('🔄 Revalidando dados e sessão do usuário...')
+      loadData()
+    }, 30000) // 30 segundos
+
+    return () => {
+      clearInterval(intervalId)
     }
   }, [user, loadData])
 
   const createProject = async (data) => {
+    // Validação adicional: verifica se usuário está autenticado
+    if (!user?.id) {
+      console.warn('createProject: usuário não autenticado no contexto')
+      return { 
+        success: false, 
+        error: 'Usuário não autenticado. Por favor, aguarde ou faça login novamente.' 
+      }
+    }
+    
     const result = await projectServiceSupabase.create(data)
     if (result.success) {
       await loadData()

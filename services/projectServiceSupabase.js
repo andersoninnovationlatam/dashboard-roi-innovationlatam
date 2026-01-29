@@ -76,17 +76,18 @@ export const projectServiceSupabase = {
     }
 
     try {
-      // Obter usuário atual
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        return { success: false, error: 'Usuário não autenticado' }
+      // Obter sessão atual (mais confiável que getUser)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        console.error('Sessão não encontrada ao criar projeto')
+        return { success: false, error: 'Usuário não autenticado. Por favor, faça login novamente.' }
       }
 
       const { data, error } = await supabase
         .from('projects')
         .insert({
           ...projectData,
-          user_id: user.id
+          user_id: session.user.id
         })
         .select()
         .single()
