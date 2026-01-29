@@ -11,6 +11,7 @@ import BarChart from '../../components/charts/BarChart'
 import RadarChart from '../../components/charts/RadarChart'
 import ProdutividadeCharts from '../../components/dashboard/ProdutividadeCharts'
 import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaCard'
+import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
 const Dashboard = () => {
@@ -332,62 +333,36 @@ const Dashboard = () => {
     <div>
       {/* Cards de KPI - Movidos para o topo */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Economia Líquida/Ano</p>
-              <p className={`text-3xl font-bold ${(metricas.economiaAnualTotal || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatarMoeda(metricas.economiaAnualTotal || 0)}
-              </p>
-            </div>
-            <div className="w-16 h-16 bg-green-500/20 rounded-xl flex items-center justify-center">
-              <i className="fas fa-piggy-bank text-3xl text-green-600 dark:text-green-400"></i>
-            </div>
-          </div>
-        </Card>
+        <KPICard
+          label="Economia Líquida/Ano"
+          value={formatarMoeda(metricas.economiaAnualTotal || 0)}
+          icon="fas fa-piggy-bank"
+          color="green"
+          isPositive={(metricas.economiaAnualTotal || 0) >= 0}
+        />
 
-        <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Tempo Economizado</p>
-              <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">
-                {formatarHoras(metricas.tempoEconomizadoAnualHoras || 0)}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">/ano</p>
-            </div>
-            <div className="w-16 h-16 bg-cyan-500/20 rounded-xl flex items-center justify-center">
-              <i className="fas fa-clock text-3xl text-cyan-600 dark:text-cyan-400"></i>
-            </div>
-          </div>
-        </Card>
+        <KPICard
+          label="Tempo Economizado"
+          value={formatarHoras(metricas.tempoEconomizadoAnualHoras || 0)}
+          icon="fas fa-clock"
+          color="cyan"
+          subLabel="/ano"
+        />
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">ROI 1º Ano</p>
-              <p className={`text-3xl font-bold ${(metricas.roiGeral || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatarROI(metricas.roiGeral || 0)}
-              </p>
-            </div>
-            <div className="w-16 h-16 bg-purple-500/20 rounded-xl flex items-center justify-center">
-              <i className="fas fa-chart-line text-3xl text-purple-600 dark:text-purple-400"></i>
-            </div>
-          </div>
-        </Card>
+        <KPICard
+          label="ROI 1º Ano"
+          value={formatarROI(metricas.roiGeral || 0)}
+          icon="fas fa-chart-line"
+          color="purple"
+          isPositive={(metricas.roiGeral || 0) >= 0}
+        />
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Payback Médio</p>
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {formatarPayback(metricas.paybackMedioMeses || Infinity)}
-              </p>
-            </div>
-            <div className="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center">
-              <i className="fas fa-sync-alt text-3xl text-blue-600 dark:text-blue-400"></i>
-            </div>
-          </div>
-        </Card>
+        <KPICard
+          label="Payback Médio"
+          value={formatarPayback(metricas.paybackMedioMeses || Infinity)}
+          icon="fas fa-sync-alt"
+          color="blue"
+        />
       </div>
 
       {/* Gráficos Específicos por Tipo de Indicador */}
