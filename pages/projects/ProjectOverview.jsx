@@ -5,6 +5,7 @@ import { exportService } from '../../services/exportService'
 import Loading from '../../components/common/Loading'
 import Button from '../../components/common/Button'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { MessageDialog } from '../../components/common/MessageDialog'
 
 const ProjectOverview = () => {
   const { id } = useParams()
@@ -16,6 +17,13 @@ const ProjectOverview = () => {
   const [indicators, setIndicators] = useState([])
   const [metricas, setMetricas] = useState(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [messageDialog, setMessageDialog] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  })
   const [activeTab, setActiveTab] = useState(() => {
     if (location.pathname.includes('/dashboard')) return 0
     // if (location.pathname.includes('/reports')) return 1 // Comentado - Relatórios desabilitado
@@ -129,27 +137,79 @@ const ProjectOverview = () => {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                const result = exportService.exportProjectToPDF(id)
-                if (!result.success) {
-                  alert(`Erro ao exportar PDF: ${result.error}`)
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true)
+                try {
+                  const result = await exportService.exportProjectToPDF(id)
+                  if (result.success) {
+                    setMessageDialog({
+                      isOpen: true,
+                      type: 'success',
+                      title: 'Exportação Concluída',
+                      message: `PDF exportado com sucesso! Arquivo: ${result.fileName}`
+                    })
+                  } else {
+                    setMessageDialog({
+                      isOpen: true,
+                      type: 'error',
+                      title: 'Erro ao Exportar PDF',
+                      message: result.error || 'Ocorreu um erro ao gerar o PDF'
+                    })
+                  }
+                } catch (error) {
+                  console.error('Erro ao exportar PDF:', error)
+                  setMessageDialog({
+                    isOpen: true,
+                    type: 'error',
+                    title: 'Erro ao Exportar PDF',
+                    message: error.message || 'Ocorreu um erro desconhecido ao gerar o PDF'
+                  })
+                } finally {
+                  setExporting(false)
                 }
               }}
             >
               <i className="fas fa-file-pdf mr-2"></i>
-              Exportar PDF
+              {exporting ? 'Exportando...' : 'Exportar PDF'}
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                const result = exportService.exportProjectToCSV(id)
-                if (!result.success) {
-                  alert(`Erro ao exportar CSV: ${result.error}`)
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true)
+                try {
+                  const result = await exportService.exportProjectToCSV(id)
+                  if (result.success) {
+                    setMessageDialog({
+                      isOpen: true,
+                      type: 'success',
+                      title: 'Exportação Concluída',
+                      message: 'CSV exportado com sucesso!'
+                    })
+                  } else {
+                    setMessageDialog({
+                      isOpen: true,
+                      type: 'error',
+                      title: 'Erro ao Exportar CSV',
+                      message: result.error || 'Ocorreu um erro ao gerar o CSV'
+                    })
+                  }
+                } catch (error) {
+                  console.error('Erro ao exportar CSV:', error)
+                  setMessageDialog({
+                    isOpen: true,
+                    type: 'error',
+                    title: 'Erro ao Exportar CSV',
+                    message: error.message || 'Ocorreu um erro desconhecido ao gerar o CSV'
+                  })
+                } finally {
+                  setExporting(false)
                 }
               }}
             >
               <i className="fas fa-file-csv mr-2"></i>
-              Exportar CSV
+              {exporting ? 'Exportando...' : 'Exportar CSV'}
             </Button>
             <Button
               variant="outline"
@@ -215,10 +275,24 @@ const ProjectOverview = () => {
           if (result.success) {
             navigate('/projects')
           } else {
-            alert(`Erro ao excluir projeto: ${result.error || 'Erro desconhecido'}`)
+            setMessageDialog({
+              isOpen: true,
+              type: 'error',
+              title: 'Erro ao Excluir Projeto',
+              message: result.error || 'Erro desconhecido'
+            })
           }
         }}
         onCancel={() => setShowDeleteDialog(false)}
+      />
+
+      {/* Dialog de Mensagem (Sucesso/Erro) */}
+      <MessageDialog
+        isOpen={messageDialog.isOpen}
+        type={messageDialog.type}
+        title={messageDialog.title}
+        message={messageDialog.message}
+        onClose={() => setMessageDialog({ ...messageDialog, isOpen: false })}
       />
     </div>
   )

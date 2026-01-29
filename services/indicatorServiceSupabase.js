@@ -15,6 +15,11 @@ const isValidUUID = (id) => {
 
 export const indicatorServiceSupabase = {
   /**
+   * Valida se um ID é um UUID válido
+   */
+  isValidUUID,
+
+  /**
    * Retorna todos os indicadores do usuário autenticado
    */
   async getAll() {
