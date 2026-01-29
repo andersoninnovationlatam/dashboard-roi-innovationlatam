@@ -131,7 +131,7 @@ const Settings = () => {
       </div>
       {/* Versão no canto inferior direito */}
       <div className="fixed bottom-4 right-4 text-xs text-slate-400 dark:text-slate-500">
-        v0.1.0
+        v0.1.2
       </div>
     </div>
   )

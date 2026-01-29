@@ -1,6 +1,6 @@
 // Tipos para dados de Baseline
 
-export type IndicatorType = 
+export type IndicatorType =
   | 'PRODUTIVIDADE'
   | 'INCREMENTO RECEITA'
   | 'CUSTOS RELACIONADOS'
@@ -106,7 +106,7 @@ export interface SatisfacaoBaseline {
   tipoScore: 'NPS' | 'eNPS' | 'outro'
 }
 
-export type BaselineData = 
+export type BaselineData =
   | ProdutividadeBaseline
   | IncrementoReceitaBaseline
   | CustosRelacionadosBaseline
