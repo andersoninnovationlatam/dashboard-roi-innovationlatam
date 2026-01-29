@@ -86,18 +86,25 @@ export interface ReducaoRiscoBaseline {
 
 export interface QualidadeDecisaoBaseline {
   tipo: 'QUALIDADE DECISÃO'
-  criterios: Array<{
-    id: string
-    nome: string
-    avaliacao: number // 0-100
-  }>
-  scoreMedio: number // Calculado
+  numeroDecisoesPeriodo: number           // quantidade de decisões
+  periodo: 'dia' | 'semana' | 'mês'      // período de referência
+  taxaAcertoAtual: number                 // % (0-100)
+  custoMedioDecisaoErrada: number         // R$
+  tempoMedioDecisao: number               // em minutos
+  pessoasEnvolvidas: number               // quantidade
+  valorHoraMedio: number                  // R$/hora
 }
 
 export interface VelocidadeBaseline {
   tipo: 'VELOCIDADE'
-  tempoInicialProcesso: number // em minutos ou horas
-  unidadeTempo: 'minutos' | 'horas' | 'dias'
+  tempoMedioEntregaAtual: number  // dias ou horas
+  unidadeTempoEntrega: 'dias' | 'horas'
+  numeroEntregasPeriodo: number
+  periodoEntregas: 'dia' | 'semana' | 'mês' | 'ano'
+  custoPorAtraso: number  // R$ por unidade de tempo
+  pessoasEnvolvidas: number
+  valorHoraMedio: number  // R$/hora
+  tempoTrabalhoPorEntrega: number  // horas
 }
 
 export interface SatisfacaoBaseline {

@@ -104,20 +104,38 @@ export interface PostIAReducaoRisco {
 
 export interface PostIAQualidadeDecisao {
   tipo: 'QUALIDADE DECISÃO'
-  criterios: Array<{
-    id: string
-    nome: string
-    avaliacao: number
-  }>
-  scoreMedioDepois: number
-  deltaScore: number
+  numeroDecisoesPeriodoComIA: number      // quantidade de decisões com IA
+  periodoComIA: 'dia' | 'semana' | 'mês' // período de referência
+  taxaAcertoComIA: number                 // % (0-100)
+  custoMedioDecisaoErradaComIA: number    // R$
+  tempoMedioDecisaoComIA: number          // em minutos
+  pessoasEnvolvidasComIA: number          // quantidade
+  // Métricas calculadas (6 outputs)
+  melhoriaTaxaAcerto: number              // % (taxa com IA - taxa atual)
+  economiaErrosEvitados: number           // R$/mês
+  economiaTempo: number                   // horas/mês
+  valorTempoEconomizado: number           // R$
+  beneficioTotalMensal: number            // R$
+  roiMelhoria: number                     // %
 }
 
 export interface PostIAVelocidade {
   tipo: 'VELOCIDADE'
-  tempoDepoisProcesso: number
-  unidadeTempo: 'minutos' | 'horas' | 'dias'
-  deltaTempo: number
+  tempoMedioEntregaComIA: number  // dias ou horas
+  unidadeTempoEntregaComIA: 'dias' | 'horas'
+  numeroEntregasPeriodoComIA: number
+  periodoEntregasComIA: 'dia' | 'semana' | 'mês' | 'ano'
+  custoPorAtrasoReduzido: number  // R$
+  pessoasEnvolvidasComIA: number
+  tempoTrabalhoPorEntregaComIA: number  // horas
+
+  // Métricas calculadas (6)
+  reducaoTempoEntrega: number      // %
+  aumentoCapacidade: number        // entregas/mês
+  economiaAtrasos: number          // R$/mês
+  valorTempoEconomizado: number    // R$
+  ganhoProdutividade: number       // %
+  roiVelocidade: number            // %
 }
 
 export interface PostIASatisfacao {
