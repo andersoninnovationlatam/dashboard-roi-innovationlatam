@@ -53,7 +53,8 @@ const Header = ({ onMenuClick }) => {
               )}
             </button>
 
-            {/* Notifications */}
+            {/* Notifications - COMENTADO */}
+            {/* 
             <button
               className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 relative"
               title="Notificações"
@@ -61,6 +62,7 @@ const Header = ({ onMenuClick }) => {
               <i className="fas fa-bell text-xl"></i>
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
+            */}
 
             {/* User Menu */}
             {user && (

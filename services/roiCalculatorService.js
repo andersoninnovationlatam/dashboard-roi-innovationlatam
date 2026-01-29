@@ -15,18 +15,19 @@ const toNumber = (value, defaultValue = 0) => {
 
 /**
  * Converte período para multiplicador mensal
+ * Formato atual: 'Diário' | 'Semanal' | 'Mensal'
  */
-const periodoParaMultiplicador = (periodo, quantidade) => {
+const calcularHorasPorMes = (quantidade, periodo) => {
   const qtd = toNumber(quantidade)
   if (qtd === 0) return 0
   
   switch (periodo) {
-    case 'dias':
-      return qtd * 30 // Assumindo 30 dias por mês
-    case 'semanas':
-      return qtd * 4.33 // Média de semanas por mês
-    case 'meses':
-      return qtd
+    case 'Diário':
+      return qtd * 30 // 30 dias por mês (média)
+    case 'Semanal':
+      return qtd * 4.33 // 52 semanas / 12 meses = 4.333... semanas por mês
+    case 'Mensal':
+      return qtd // Já está em meses
     default:
       return qtd
   }
@@ -47,16 +48,18 @@ const calcularCustoHoraMedio = (pessoas) => {
 
 /**
  * Calcula tempo total em minutos considerando pessoas
+ * Formato atual: usa tempoGasto (minutos) e frequenciaReal
  */
 const calcularTempoTotalPessoas = (pessoas) => {
   if (!pessoas || pessoas.length === 0) return 0
   
   return pessoas.reduce((total, pessoa) => {
-    const tempo = toNumber(pessoa.tempoOperacao)
-    const qtdOperacoes = toNumber(pessoa.quantidadeOperacoesTotal)
-    const periodo = pessoa.periodoOperacoesTotal || 'dias'
-    const multiplicador = periodoParaMultiplicador(periodo, qtdOperacoes)
-    return total + (tempo * multiplicador)
+    const tempoGasto = toNumber(pessoa.tempoGasto) // em minutos
+    const quantidade = toNumber(pessoa.frequenciaReal?.quantidade || 0)
+    const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
+    const horasPorMes = calcularHorasPorMes(quantidade, periodo)
+    // Converte horas para minutos e multiplica pelo tempo gasto por execução
+    return total + (tempoGasto * horasPorMes)
   }, 0)
 }
 
@@ -68,66 +71,35 @@ export const calcularROIIndicador = (indicador) => {
     return null
   }
 
-  // Suporta tanto formato antigo (comIA) quanto novo (ia)
-  // A nova estrutura retorna { info, baseline, ia, custos } do indicatorDataService
-  const baseline = indicador.baseline || {}
-  const comIA = indicador.comIA || indicador.ia || {}
+  // Formato atual: usa baselineData e postIAData com pessoas (tempoGasto e frequenciaReal)
+  const baselineData = indicador.baselineData || {}
+  const postIAData = indicador.postIAData || indicador.post_ia_data || {}
   
-  // Ajusta estrutura de pessoas se vier do formato novo
-  if (indicador.ia && !baseline.pessoas && baseline.pessoas === undefined) {
-    // baseline já vem com pessoas do indicatorDataService
-  }
-  
-  // Verifica se usa novo cálculo (campos de volume preenchidos)
-  const usarNovoCalculo = 
-    toNumber(baseline.volumeOperacoesBase) > 0 &&
-    toNumber(baseline.qtdPessoasBase) > 0 &&
-    toNumber(baseline.tempoOperacaoBase) > 0 &&
-    toNumber(comIA.volumeIA) > 0 &&
-    toNumber(comIA.tempoIA) > 0
-
   let tempoBaselineMinutos = 0
   let tempoComIAMinutos = 0
   let volumeBaseline = 0
   let volumeIA = 0
 
-  if (usarNovoCalculo) {
-    // NOVO CÁLCULO - Usando campos de volume
-    const volumeOperacoesBase = toNumber(baseline.volumeOperacoesBase)
-    const qtdPessoasBase = toNumber(baseline.qtdPessoasBase)
-    const tempoOperacaoBase = toNumber(baseline.tempoOperacaoBase)
-    const volumeIAValue = toNumber(comIA.volumeIA)
-    const tempoIAValue = toNumber(comIA.tempoIA)
-
-    // Tempo total baseline (minutos/mês)
-    tempoBaselineMinutos = volumeOperacoesBase * qtdPessoasBase * tempoOperacaoBase
-    
-    // Tempo total com IA (minutos/mês)
-    tempoComIAMinutos = volumeIAValue * tempoIAValue
-    
-    volumeBaseline = volumeOperacoesBase * qtdPessoasBase
-    volumeIA = volumeIAValue
-  } else {
-    // CÁLCULO ANTIGO - Usando pessoas detalhadas
-    const pessoasBaseline = baseline.pessoas || []
-    const pessoasIA = comIA.pessoas || []
-    
-    tempoBaselineMinutos = calcularTempoTotalPessoas(pessoasBaseline)
-    tempoComIAMinutos = calcularTempoTotalPessoas(pessoasIA)
-    
-    // Calcula volume baseado nas operações das pessoas
-    pessoasBaseline.forEach(p => {
-      const qtd = toNumber(p.quantidadeOperacoesTotal)
-      const periodo = p.periodoOperacoesTotal || 'dias'
-      volumeBaseline += periodoParaMultiplicador(periodo, qtd)
-    })
-    
-    pessoasIA.forEach(p => {
-      const qtd = toNumber(p.quantidadeOperacoesTotal)
-      const periodo = p.periodoOperacoesTotal || 'dias'
-      volumeIA += periodoParaMultiplicador(periodo, qtd)
-    })
-  }
+  // CÁLCULO ATUAL - Usando pessoas detalhadas com formato atual
+  const pessoasBaseline = baselineData.pessoas || []
+  const pessoasPostIA = postIAData.pessoas || []
+  
+  // Calcula tempo total em minutos/mês
+  tempoBaselineMinutos = calcularTempoTotalPessoas(pessoasBaseline)
+  tempoComIAMinutos = calcularTempoTotalPessoas(pessoasPostIA)
+  
+  // Calcula volume (quantidade de execuções por mês) baseado na frequência real
+  pessoasBaseline.forEach(p => {
+    const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
+    const periodo = p.frequenciaReal?.periodo || 'Mensal'
+    volumeBaseline += calcularHorasPorMes(quantidade, periodo)
+  })
+  
+  pessoasPostIA.forEach(p => {
+    const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
+    const periodo = p.frequenciaReal?.periodo || 'Mensal'
+    volumeIA += calcularHorasPorMes(quantidade, periodo)
+  })
 
   // Economia de tempo
   const tempoEconomizadoMinutos = Math.max(0, tempoBaselineMinutos - tempoComIAMinutos)
@@ -135,14 +107,13 @@ export const calcularROIIndicador = (indicador) => {
   const tempoEconomizadoAnualHoras = tempoEconomizadoHoras * 12
 
   // Custo hora médio (baseline)
-  const pessoasBaseline = baseline.pessoas || []
   const custoHoraMedio = calcularCustoHoraMedio(pessoasBaseline) || 80 // Default R$ 80/hora
 
   // Economia financeira
   const economiaBrutaAnual = tempoEconomizadoAnualHoras * custoHoraMedio
 
-  // Custos da IA
-  const custoImplementacao = toNumber(comIA.custoImplementacao)
+  // Custos da IA (vem de postIAData ou custos_data)
+  const custoImplementacao = toNumber(postIAData.custoImplementacao || 0)
   
   // Calcula custos de ferramentas (suporta formato antigo e novo)
   let custosArray = []
@@ -159,8 +130,8 @@ export const calcularROIIndicador = (indicador) => {
     return total + valor
   }, 0)
   
-  const custoMensalManutencao = toNumber(comIA.custoMensalManutencao)
-  const custoMensalTotal = custoMensalFerramentas + custoMensalManutencao
+  // Custo mensal total (apenas ferramentas, não há mais custoMensalManutencao separado)
+  const custoMensalTotal = custoMensalFerramentas
   const custoAnualRecorrenteIA = custoMensalTotal * 12
 
   // Economia líquida
@@ -172,10 +143,15 @@ export const calcularROIIndicador = (indicador) => {
     : 0
 
   // Eficiência do Processo (%)
-  const tempoOperacaoBase = toNumber(baseline.tempoOperacaoBase)
-  const tempoIA = toNumber(comIA.tempoIA)
-  const eficiencia = tempoOperacaoBase > 0 
-    ? (1 - (tempoIA / tempoOperacaoBase)) * 100 
+  // Calcula tempo médio por execução
+  const tempoMedioBaseline = pessoasBaseline.length > 0 && volumeBaseline > 0
+    ? tempoBaselineMinutos / volumeBaseline
+    : 0
+  const tempoMedioPostIA = pessoasPostIA.length > 0 && volumeIA > 0
+    ? tempoComIAMinutos / volumeIA
+    : 0
+  const eficiencia = tempoMedioBaseline > 0 
+    ? (1 - (tempoMedioPostIA / tempoMedioBaseline)) * 100 
     : 0
 
   // Ganho de Produtividade (%)
@@ -184,8 +160,8 @@ export const calcularROIIndicador = (indicador) => {
     : 0
 
   // Execuções Equivalentes
-  const execucoesEquivalentes = tempoIA > 0 
-    ? tempoOperacaoBase / tempoIA 
+  const execucoesEquivalentes = tempoMedioPostIA > 0 
+    ? tempoMedioBaseline / tempoMedioPostIA 
     : 0
 
   // ROI Percentual (1º Ano)
@@ -237,7 +213,6 @@ export const calcularROIIndicador = (indicador) => {
     // Custos detalhados
     custoImplementacao,
     custoMensalFerramentas,
-    custoMensalManutencao,
     custoMensalTotal,
     
     // ROI
@@ -254,7 +229,6 @@ export const calcularROIIndicador = (indicador) => {
     // Dados de referência
     volumeBaseline,
     volumeIA,
-    usarNovoCalculo,
     custoHoraMedio
   }
 }

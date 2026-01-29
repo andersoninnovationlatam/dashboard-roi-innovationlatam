@@ -104,7 +104,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               <span className="font-medium">Configurações</span>
             </Link>
             <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
-              © 2024 Dashboard ROI
+              © {new Date().getFullYear()} Dashboard ROI
             </p>
           </div>
         </div>

@@ -82,6 +82,15 @@ const Dashboard = () => {
       try {
         const result = await calculateProjectROI(id)
         setMetricas(result)
+        // Debug: Verificar valores dos cards
+        console.log('📊 Métricas calculadas:', {
+          economiaBrutaAnualTotal: result?.economiaBrutaAnualTotal,
+          custoImplementacaoTotal: result?.custoImplementacaoTotal,
+          custoAnualRecorrenteTotal: result?.custoAnualRecorrenteTotal,
+          ganhoProdutividadeMedio: result?.ganhoProdutividadeMedio,
+          ganhoCapacidadeMedio: result?.ganhoCapacidadeMedio,
+          totalIndicadores: result?.totalIndicadores
+        })
       } catch (error) {
         console.error('Erro ao calcular ROI:', error)
         setMetricas(null)
