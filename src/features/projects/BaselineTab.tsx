@@ -77,16 +77,20 @@ export const BaselineTab = ({
       case 'MELHORIA MARGEM':
         return {
           tipo: 'MELHORIA MARGEM',
-          margemAtual: 0,
-          margemProjetada: 0,
-          tipoMargem: 'percentual'
+          receitaBrutaMensal: 0,
+          custoTotalMensal: 0,
+          margemBrutaAtual: 0,
+          volumeTransacoes: 0
         } as BaselineData
       case 'REDUÇÃO DE RISCO':
         return {
           tipo: 'REDUÇÃO DE RISCO',
-          probabilidade: 0,
+          tipoRisco: '',
+          probabilidadeAtual: 0,
           impactoFinanceiro: 0,
-          valorEvitado: 0
+          frequenciaAvaliacao: 0,
+          periodoAvaliacao: 'mês',
+          custoMitigacaoAtual: 0
         } as BaselineData
       case 'QUALIDADE DECISÃO':
         return {
@@ -152,17 +156,21 @@ export const BaselineTab = ({
         case 'MELHORIA MARGEM':
           setData({
             tipo: 'MELHORIA MARGEM',
-            margemAtual: 0,
-            margemProjetada: 0,
-            tipoMargem: 'percentual'
+            receitaBrutaMensal: 0,
+            custoTotalMensal: 0,
+            margemBrutaAtual: 0,
+            volumeTransacoes: 0
           } as BaselineData)
           break
         case 'REDUÇÃO DE RISCO':
           setData({
             tipo: 'REDUÇÃO DE RISCO',
-            probabilidade: 0,
+            tipoRisco: '',
+            probabilidadeAtual: 0,
             impactoFinanceiro: 0,
-            valorEvitado: 0
+            frequenciaAvaliacao: 0,
+            periodoAvaliacao: 'mês',
+            custoMitigacaoAtual: 0
           } as BaselineData)
           break
         case 'QUALIDADE DECISÃO':
@@ -863,36 +871,22 @@ export const BaselineTab = ({
         {tipoBaseline === 'MELHORIA MARGEM' && data.tipo === 'MELHORIA MARGEM' && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
-              <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                Tipo de Margem
-              </label>
-              <select
-                value={data.tipoMargem}
-                onChange={(e) => {
-                  const updatedData: BaselineData = {
-                    ...data,
-                    tipoMargem: e.target.value as 'percentual' | 'valor'
-                  }
-                  updateData(updatedData)
-                }}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
-              >
-                <option value="percentual">Percentual (%)</option>
-                <option value="valor">Valor (R$)</option>
-              </select>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                Dados de Baseline - Melhoria de Margem
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                    Margem Atual {data.tipoMargem === 'percentual' ? '(%)' : '(R$)'}
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Receita Bruta Mensal (R$)
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={data.tipo === 'MELHORIA MARGEM' ? formatNumberValue(data.margemAtual) : ''}
+                    value={formatNumberValue(data.receitaBrutaMensal)}
                     onChange={(e) => {
                       const updatedData: BaselineData = {
                         ...data,
-                        margemAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                        receitaBrutaMensal: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
                       }
                       updateData(updatedData)
                     }}
@@ -901,25 +895,111 @@ export const BaselineTab = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                    Margem Projetada {data.tipoMargem === 'percentual' ? '(%)' : '(R$)'}
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Custo Total Mensal (R$)
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={data.tipo === 'MELHORIA MARGEM' ? formatNumberValue(data.margemProjetada) : ''}
+                    value={formatNumberValue(data.custoTotalMensal)}
                     onChange={(e) => {
                       const updatedData: BaselineData = {
                         ...data,
-                        margemProjetada: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                        custoTotalMensal: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
                       }
                       updateData(updatedData)
                     }}
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Margem Bruta Atual (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formatNumberValue(data.margemBrutaAtual)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        margemBrutaAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Margem Bruta = ((Receita - Custo) / Receita) × 100
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Volume de Transações/Mês
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.volumeTransacoes)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        volumeTransacoes: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0"
                   />
                 </div>
               </div>
+
+              {/* Resumo Calculado */}
+              {data.receitaBrutaMensal > 0 && (
+                <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Resumo Baseline</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Receita Mensal:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        R$ {data.receitaBrutaMensal.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Custo Mensal:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        R$ {data.custoTotalMensal.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Margem Bruta:</span>
+                      <span className="ml-2 font-semibold text-indigo-600 dark:text-indigo-400">
+                        {data.margemBrutaAtual.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Lucro Bruto Mensal:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        R$ {(data.receitaBrutaMensal - data.custoTotalMensal).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -928,69 +1008,192 @@ export const BaselineTab = ({
         {tipoBaseline === 'REDUÇÃO DE RISCO' && data.tipo === 'REDUÇÃO DE RISCO' && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                Dados de Baseline - Redução de Risco
+              </h3>
+              
+              {/* Tipo de Risco */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Tipo de Risco (descrição)
+                </label>
+                <input
+                  type="text"
+                  value={data.tipoRisco || ''}
+                  onChange={(e) => {
+                    const updatedData: BaselineData = {
+                      ...data,
+                      tipoRisco: e.target.value
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: Falha de segurança, perda de dados, interrupção de serviço"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Probabilidade Atual */}
                 <div>
-                  <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                    Probabilidade (%)
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Probabilidade de Ocorrência Atual (%)
                   </label>
                   <input
                     type="number"
                     min="0"
                     max="100"
                     step="0.01"
-                    value={data.tipo === 'REDUÇÃO DE RISCO' ? formatNumberValue(data.probabilidade) : ''}
+                    value={formatNumberValue(data.probabilidadeAtual)}
                     onChange={(e) => {
-                      const prob = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                      const impacto = data.tipo === 'REDUÇÃO DE RISCO' ? data.impactoFinanceiro : 0
-                      const valorEvitado = (prob / 100) * impacto
                       const updatedData: BaselineData = {
                         ...data,
-                        probabilidade: prob,
-                        valorEvitado
-                      } as BaselineData
+                        probabilidadeAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
                       updateData(updatedData)
                     }}
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="0.00"
                   />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Probabilidade de o risco ocorrer (0-100%)
+                  </p>
                 </div>
+
+                {/* Impacto Financeiro */}
                 <div>
-                  <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                    Impacto Financeiro (R$)
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Impacto Financeiro se Ocorrer (R$)
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={data.tipo === 'REDUÇÃO DE RISCO' ? formatNumberValue(data.impactoFinanceiro) : ''}
+                    min="0"
+                    value={formatNumberValue(data.impactoFinanceiro)}
                     onChange={(e) => {
-                      const impacto = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                      const prob = data.tipo === 'REDUÇÃO DE RISCO' ? data.probabilidade : 0
-                      const valorEvitado = (prob / 100) * impacto
                       const updatedData: BaselineData = {
                         ...data,
-                        impactoFinanceiro: impacto,
-                        valorEvitado
-                      } as BaselineData
+                        impactoFinanceiro: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
                       updateData(updatedData)
                     }}
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="0.00"
                   />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Custo estimado se o risco se materializar
+                  </p>
+                </div>
+
+                {/* Frequência de Avaliação */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Frequência de Avaliação
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={formatNumberValue(data.frequenciaAvaliacao)}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          frequenciaAvaliacao: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="0"
+                    />
+                    <select
+                      value={data.periodoAvaliacao}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          periodoAvaliacao: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="dia">por dia</option>
+                      <option value="semana">por semana</option>
+                      <option value="mês">por mês</option>
+                      <option value="ano">por ano</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Quantas vezes o risco é avaliado
+                  </p>
+                </div>
+
+                {/* Custo de Mitigação Atual */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Custo de Mitigação Atual (R$/mês)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.custoMitigacaoAtual)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        custoMitigacaoAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Custo mensal para mitigar/monitorar o risco
+                  </p>
                 </div>
               </div>
-              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    Valor Evitado (R$):
-                  </span>
-                  <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    R$ {data.valorEvitado.toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
-                  </span>
+
+              {/* Resumo Calculado */}
+              {data.probabilidadeAtual > 0 && data.impactoFinanceiro > 0 && (
+                <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Exposição ao Risco (Baseline)</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Probabilidade:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        {data.probabilidadeAtual.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Impacto:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        R$ {data.impactoFinanceiro.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Exposição Esperada:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        R$ {((data.probabilidadeAtual / 100) * data.impactoFinanceiro).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Custo Mitigação/Mês:</span>
+                      <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
+                        R$ {data.custoMitigacaoAtual.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

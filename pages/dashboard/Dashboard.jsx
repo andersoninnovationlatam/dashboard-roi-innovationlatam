@@ -11,6 +11,7 @@ import BarChart from '../../components/charts/BarChart'
 import RadarChart from '../../components/charts/RadarChart'
 import ProdutividadeCharts from '../../components/dashboard/ProdutividadeCharts'
 import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaCard'
+import MelhoriaMargemCharts from '../../components/dashboard/MelhoriaMargemCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
@@ -439,17 +440,7 @@ const Dashboard = () => {
               Análise de otimização de custos e melhoria da margem de lucro
             </p>
           </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.melhoriaMargem.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-5 border border-green-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatarMoeda(metrica.ganhoMargem || 0)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ganho de margem/ano</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <MelhoriaMargemCharts metricas={metricasPorTipo.melhoriaMargem} />
         </div>
       )}
 

@@ -241,23 +241,88 @@ export const calcularMetricasMelhoriaMargem = (indicador) => {
   const infoData = indicador.info_data || indicador.infoData || {}
 
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoMapeado = tipoIndicador === 'Melhoria Margem' ? 'MELHORIA MARGEM' : tipoIndicador
   
-  if (tipoIndicador !== 'Melhoria Margem') {
+  if (tipoMapeado !== 'MELHORIA MARGEM' && baselineData.tipo !== 'MELHORIA MARGEM' && postIAData.tipo !== 'MELHORIA MARGEM') {
     return null
   }
 
-  const margemAntes = toNumber(baselineData.margemAntes || 0)
-  const margemDepois = toNumber(postIAData.margemDepois || 0)
-  const volume = toNumber(baselineData.volume || postIAData.volume || 0)
-  const ganhoMargem = ((margemDepois - margemAntes) / 100) * volume
+  // BASELINE
+  const receitaBrutaMensal = toNumber(baselineData.receitaBrutaMensal || 0)
+  const custoTotalMensal = toNumber(baselineData.custoTotalMensal || 0)
+  const margemBrutaAtual = toNumber(baselineData.margemBrutaAtual || 0)
+  const volumeTransacoes = toNumber(baselineData.volumeTransacoes || 0)
+
+  // PÓS-IA
+  const receitaBrutaMensalEstimada = toNumber(postIAData.receitaBrutaMensalEstimada || 0)
+  const custoTotalMensalEstimado = toNumber(postIAData.custoTotalMensalEstimado || 0)
+  const margemBrutaEstimada = toNumber(postIAData.margemBrutaEstimada || 0)
+  const volumeTransacoesEstimado = toNumber(postIAData.volumeTransacoesEstimado || 0)
+
+  // CÁLCULOS
+
+  // 1. Delta Margem (%)
+  const deltaMargem = margemBrutaEstimada - margemBrutaAtual
+
+  // 2. Lucro Bruto Baseline
+  const lucroBrutoBaseline = receitaBrutaMensal - custoTotalMensal
+
+  // 3. Lucro Bruto Estimado
+  const lucroBrutoEstimado = receitaBrutaMensalEstimada - custoTotalMensalEstimado
+
+  // 4. Delta Margem em Reais (diferença de lucro)
+  const deltaMargemReais = lucroBrutoEstimado - lucroBrutoBaseline
+
+  // 5. Economia Mensal (ganho no lucro)
+  const economiaMensal = deltaMargemReais
+
+  // 6. Economia Anual
+  const economiaAnual = economiaMensal * 12
+
+  // 7. ROI da Implementação (precisa de custoImplementacao)
+  // Assumindo que o custo de implementação vem de custos_relacionados
+  const custosData = indicador.custos_relacionados || indicador.custosRelacionados || {}
+  const custoImplementacao = toNumber(custosData.custoTotalImplementacao || 0)
+  
+  const roi = custoImplementacao > 0 
+    ? ((economiaAnual - custoImplementacao) / custoImplementacao) * 100 
+    : 0
+
+  // 8. Payback (em meses)
+  const payback = economiaMensal > 0 && custoImplementacao > 0
+    ? custoImplementacao / economiaMensal
+    : 0
+
+  // 9. Impacto no Lucro Anual
+  const impactoLucroAnual = economiaAnual
 
   return {
     tipo: 'MELHORIA MARGEM',
     nome: infoData.nome || indicador.nome || 'Melhoria de Margem',
-    margemAntes,
-    margemDepois,
-    volume,
-    ganhoMargem: Math.max(0, ganhoMargem)
+    
+    // Dados Baseline
+    receitaBrutaMensal,
+    custoTotalMensal,
+    margemBrutaAtual,
+    volumeTransacoes,
+    lucroBrutoBaseline,
+    
+    // Dados Pós-IA
+    receitaBrutaMensalEstimada,
+    custoTotalMensalEstimado,
+    margemBrutaEstimada,
+    volumeTransacoesEstimado,
+    lucroBrutoEstimado,
+    
+    // Métricas Calculadas
+    deltaMargem,              // % de melhoria na margem
+    deltaMargemReais,         // R$ de melhoria na margem
+    economiaMensal,           // R$ economizado por mês
+    economiaAnual,            // R$ economizado por ano
+    roi,                      // % de ROI
+    payback,                  // meses para retorno
+    impactoLucroAnual,        // R$ de impacto anual no lucro
+    custoImplementacao        // R$ investido
   }
 }
 
