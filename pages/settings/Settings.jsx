@@ -9,7 +9,7 @@ const Settings = () => {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <div className="relative min-h-screen pb-16">
+    <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Configurações</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-2">Gerencie suas preferências e configurações da conta</p>
@@ -129,10 +129,9 @@ const Settings = () => {
           </div>
         </Card>
       </div>
-
-      {/* Versão - Canto inferior direito */}
-      <div className="fixed bottom-6 right-6">
-        <span className="text-sm font-mono text-slate-400 dark:text-slate-500">v0.0.7</span>
+      {/* Versão no canto inferior direito */}
+      <div className="fixed bottom-4 right-4 text-xs text-slate-400 dark:text-slate-500">
+        v0.0.8
       </div>
     </div>
   )

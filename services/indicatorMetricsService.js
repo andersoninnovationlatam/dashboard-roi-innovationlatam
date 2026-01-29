@@ -180,13 +180,9 @@ export const calcularMetricasIncrementoReceita = (indicador) => {
   const infoData = indicador.info_data || indicador.infoData || {}
 
   // Verifica se é tipo INCREMENTO RECEITA
-  // Pode estar em infoData.tipoIndicador ou baselineData.tipo
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
   
-  // Mapeia tipos antigos para novos
-  const tipoMapeado = tipoIndicador === 'Incremento Receita' ? 'INCREMENTO RECEITA' : tipoIndicador
-  
-  if (tipoMapeado !== 'INCREMENTO RECEITA' && baselineData.tipo !== 'INCREMENTO RECEITA' && postIAData.tipo !== 'INCREMENTO RECEITA') {
+  if (tipoIndicador !== 'Incremento Receita' && baselineData.tipo !== 'INCREMENTO RECEITA' && postIAData.tipo !== 'INCREMENTO RECEITA') {
     return null
   }
 
@@ -204,26 +200,226 @@ export const calcularMetricasIncrementoReceita = (indicador) => {
 }
 
 /**
+ * Calcula métricas específicas para indicador do tipo CAPACIDADE ANALÍTICA
+ */
+export const calcularMetricasCapacidadeAnalitica = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Capacidade Analítica') {
+    return null
+  }
+
+  const quantidadeAnalisesAntes = toNumber(baselineData.quantidadeAnalises || 0)
+  const quantidadeAnalisesDepois = toNumber(postIAData.quantidadeAnalises || 0)
+  const aumentoCapacidade = quantidadeAnalisesAntes > 0 
+    ? ((quantidadeAnalisesDepois - quantidadeAnalisesAntes) / quantidadeAnalisesAntes) * 100 
+    : 0
+
+  return {
+    tipo: 'CAPACIDADE ANALÍTICA',
+    nome: infoData.nome || indicador.nome || 'Capacidade Analítica',
+    quantidadeAnalisesAntes,
+    quantidadeAnalisesDepois,
+    aumentoCapacidade: Math.round(aumentoCapacidade * 100) / 100
+  }
+}
+
+/**
+ * Calcula métricas específicas para indicador do tipo MELHORIA MARGEM
+ */
+export const calcularMetricasMelhoriaMargem = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Melhoria Margem') {
+    return null
+  }
+
+  const margemAntes = toNumber(baselineData.margemAntes || 0)
+  const margemDepois = toNumber(postIAData.margemDepois || 0)
+  const volume = toNumber(baselineData.volume || postIAData.volume || 0)
+  const ganhoMargem = ((margemDepois - margemAntes) / 100) * volume
+
+  return {
+    tipo: 'MELHORIA MARGEM',
+    nome: infoData.nome || indicador.nome || 'Melhoria de Margem',
+    margemAntes,
+    margemDepois,
+    volume,
+    ganhoMargem: Math.max(0, ganhoMargem)
+  }
+}
+
+/**
+ * Calcula métricas específicas para indicador do tipo REDUÇÃO DE RISCO
+ */
+export const calcularMetricasReducaoRisco = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Redução de Risco') {
+    return null
+  }
+
+  const probabilidadeAntes = toNumber(baselineData.probabilidade || 0)
+  const probabilidadeDepois = toNumber(postIAData.probabilidade || 0)
+  const impactoFinanceiro = toNumber(baselineData.impactoFinanceiro || postIAData.impactoFinanceiro || 0)
+  const reducaoProbabilidade = probabilidadeAntes - probabilidadeDepois
+  const impactoEvitado = (reducaoProbabilidade / 100) * impactoFinanceiro
+
+  return {
+    tipo: 'REDUÇÃO DE RISCO',
+    nome: infoData.nome || indicador.nome || 'Redução de Risco',
+    probabilidadeAntes,
+    probabilidadeDepois,
+    impactoFinanceiro,
+    impactoEvitado: Math.max(0, impactoEvitado)
+  }
+}
+
+/**
+ * Calcula métricas específicas para indicador do tipo QUALIDADE DECISÃO
+ */
+export const calcularMetricasQualidadeDecisao = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Qualidade Decisão') {
+    return null
+  }
+
+  const qualidadeAntes = toNumber(baselineData.scoreQualidade || 0)
+  const qualidadeDepois = toNumber(postIAData.scoreQualidade || 0)
+  const melhoriaQualidade = qualidadeDepois - qualidadeAntes
+
+  return {
+    tipo: 'QUALIDADE DECISÃO',
+    nome: infoData.nome || indicador.nome || 'Qualidade de Decisão',
+    qualidadeAntes,
+    qualidadeDepois,
+    melhoriaQualidade: Math.max(0, melhoriaQualidade)
+  }
+}
+
+/**
+ * Calcula métricas específicas para indicador do tipo VELOCIDADE
+ */
+export const calcularMetricasVelocidade = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Velocidade') {
+    return null
+  }
+
+  const tempoEntregaAntes = toNumber(baselineData.tempoEntrega || 0)
+  const tempoEntregaDepois = toNumber(postIAData.tempoEntrega || 0)
+  const reducaoTempo = tempoEntregaAntes > 0
+    ? ((tempoEntregaAntes - tempoEntregaDepois) / tempoEntregaAntes) * 100
+    : 0
+
+  return {
+    tipo: 'VELOCIDADE',
+    nome: infoData.nome || indicador.nome || 'Velocidade',
+    tempoEntregaAntes,
+    tempoEntregaDepois,
+    reducaoTempo: Math.round(reducaoTempo * 100) / 100
+  }
+}
+
+/**
+ * Calcula métricas específicas para indicador do tipo SATISFAÇÃO
+ */
+export const calcularMetricasSatisfacao = (indicador) => {
+  if (!indicador) return null
+
+  const baselineData = indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const infoData = indicador.info_data || indicador.infoData || {}
+
+  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  
+  if (tipoIndicador !== 'Satisfação') {
+    return null
+  }
+
+  const scoreAntes = toNumber(baselineData.scoreSatisfacao || 0)
+  const scoreDepois = toNumber(postIAData.scoreSatisfacao || 0)
+  const deltaScore = scoreDepois - scoreAntes
+
+  return {
+    tipo: 'SATISFAÇÃO',
+    nome: infoData.nome || indicador.nome || 'Satisfação',
+    scoreAntes,
+    scoreDepois,
+    deltaScore: Math.max(0, deltaScore)
+  }
+}
+
+/**
  * Detecta quais tipos de indicadores existem no projeto e retorna métricas específicas
  */
 export const calcularMetricasPorTipo = (indicators) => {
   if (!indicators || !Array.isArray(indicators) || indicators.length === 0) {
     return {
       produtividade: [],
+      capacidadeAnalitica: [],
       incrementoReceita: [],
-      outros: []
+      melhoriaMargem: [],
+      reducaoRisco: [],
+      qualidadeDecisao: [],
+      velocidade: [],
+      satisfacao: []
     }
   }
 
   const metricasProdutividade = []
+  const metricasCapacidadeAnalitica = []
   const metricasIncrementoReceita = []
-  const outros = []
+  const metricasMelhoriaMargem = []
+  const metricasReducaoRisco = []
+  const metricasQualidadeDecisao = []
+  const metricasVelocidade = []
+  const metricasSatisfacao = []
 
   indicators.forEach(indicador => {
     // Tenta calcular métricas de produtividade
     const metricasProd = calcularMetricasProdutividade(indicador)
     if (metricasProd) {
       metricasProdutividade.push(metricasProd)
+      return
+    }
+
+    // Tenta calcular métricas de capacidade analítica
+    const metricasCapacidade = calcularMetricasCapacidadeAnalitica(indicador)
+    if (metricasCapacidade) {
+      metricasCapacidadeAnalitica.push(metricasCapacidade)
       return
     }
 
@@ -234,16 +430,50 @@ export const calcularMetricasPorTipo = (indicators) => {
       return
     }
 
-    // Outros tipos (podem ser implementados no futuro)
-    outros.push({
-      tipo: indicador.info_data?.tipoIndicador || indicador.tipoIndicador || 'OUTROS',
-      indicadorNome: indicador.info_data?.nome || indicador.nome || 'Indicador'
-    })
+    // Tenta calcular métricas de melhoria de margem
+    const metricasMargem = calcularMetricasMelhoriaMargem(indicador)
+    if (metricasMargem) {
+      metricasMelhoriaMargem.push(metricasMargem)
+      return
+    }
+
+    // Tenta calcular métricas de redução de risco
+    const metricasRisco = calcularMetricasReducaoRisco(indicador)
+    if (metricasRisco) {
+      metricasReducaoRisco.push(metricasRisco)
+      return
+    }
+
+    // Tenta calcular métricas de qualidade de decisão
+    const metricasQualidade = calcularMetricasQualidadeDecisao(indicador)
+    if (metricasQualidade) {
+      metricasQualidadeDecisao.push(metricasQualidade)
+      return
+    }
+
+    // Tenta calcular métricas de velocidade
+    const metricasVel = calcularMetricasVelocidade(indicador)
+    if (metricasVel) {
+      metricasVelocidade.push(metricasVel)
+      return
+    }
+
+    // Tenta calcular métricas de satisfação
+    const metricasSat = calcularMetricasSatisfacao(indicador)
+    if (metricasSat) {
+      metricasSatisfacao.push(metricasSat)
+      return
+    }
   })
 
   return {
     produtividade: metricasProdutividade,
+    capacidadeAnalitica: metricasCapacidadeAnalitica,
     incrementoReceita: metricasIncrementoReceita,
-    outros
+    melhoriaMargem: metricasMelhoriaMargem,
+    reducaoRisco: metricasReducaoRisco,
+    qualidadeDecisao: metricasQualidadeDecisao,
+    velocidade: metricasVelocidade,
+    satisfacao: metricasSatisfacao
   }
 }

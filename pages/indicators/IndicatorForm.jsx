@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { indicatorServiceSupabase } from '../../services/indicatorServiceSupabase'
-import { supabase } from '../../src/lib/supabase'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Card from '../../components/common/Card'
@@ -19,7 +18,7 @@ const IndicatorForm = () => {
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
   const { getProjectById, getIndicatorById } = useData()
-  const { user, loading: authLoading } = useAuth()
+  const { user } = useAuth()
   
   const project = getProjectById(id)
   const isEditing = !!indicatorId
@@ -48,48 +47,22 @@ const IndicatorForm = () => {
   const [forceUpdate, setForceUpdate] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
 
-  // Verifica se está carregando autenticação
-  if (authLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Verificando autenticação...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Verifica se usuário está autenticado
-  if (!user?.id) {
-    return (
-      <div className="p-6">
-        <Card>
-          <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-              Acesso Negado
-            </h3>
-            <p className="text-red-700 dark:text-red-300 mb-4">
-              Você precisa estar autenticado para criar ou editar indicadores.
-            </p>
-            <Button onClick={() => navigate('/login')} variant="primary">
-              Fazer Login
-            </Button>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-
   useEffect(() => {
-    // Carrega dados do Supabase quando está editando
     const loadIndicatorData = async () => {
       if (isEditing && indicatorId) {
         try {
           const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
           
           if (completeIndicator) {
-            // Normaliza pessoas do baseline
+            // Carrega dados do Supabase
+            const infoData = completeIndicator.nome ? {
+              nome: completeIndicator.nome,
+              tipoIndicador: completeIndicator.tipoIndicador,
+              descricao: completeIndicator.descricao,
+              camposEspecificos: completeIndicator.camposEspecificos
+            } : null
+
+            // Normaliza pessoas do baseline para compatibilidade
             const pessoasBaseline = (completeIndicator.baselineData?.pessoas || []).map(pessoa => ({
               ...pessoa,
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
@@ -102,15 +75,15 @@ const IndicatorForm = () => {
             }))
 
             setFormData({
-              nome: completeIndicator.nome || '',
-              tipoIndicador: completeIndicator.tipoIndicador || 'Produtividade',
-              descricao: completeIndicator.descricao || '',
-              camposEspecificos: completeIndicador.camposEspecificos || {},
+              nome: infoData?.nome || '',
+              tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
+              descricao: infoData?.descricao || '',
+              camposEspecificos: infoData?.camposEspecificos || {},
               baseline: {
                 pessoas: pessoasBaseline
               },
-              baselineData: completeIndicator.baselineData?.tipo ? completeIndicator.baselineData : null,
-              postIAData: completeIndicator.postIAData?.tipo ? completeIndicator.postIAData : null,
+              baselineData: completeIndicator.baselineData || null,
+              postIAData: completeIndicator.postIAData || null,
               comIA: {
                 precisaValidacao: completeIndicator.ia?.precisaValidacao || false,
                 pessoaEnvolvida: completeIndicator.ia?.pessoaEnvolvida || false,
@@ -120,16 +93,32 @@ const IndicatorForm = () => {
               custos: completeIndicator.custos || []
             })
           } else {
-            setError('Indicador não encontrado')
+            console.warn('Indicador não encontrado no Supabase')
           }
         } catch (error) {
           console.error('Erro ao carregar indicador:', error)
-          setError('Erro ao carregar dados do indicador')
-        } finally {
-          setDataLoaded(true)
+          setError('Erro ao carregar indicador')
         }
-      } else {
-        setDataLoaded(true)
+      } else if (!isEditing) {
+        // Se não está editando, reseta o formData
+        setFormData({
+          nome: '',
+          tipoIndicador: 'Produtividade',
+          descricao: '',
+          camposEspecificos: {},
+          baseline: {
+            pessoas: []
+          },
+          baselineData: null,
+          postIAData: null,
+        comIA: {
+          precisaValidacao: false,
+          pessoaEnvolvida: false,
+          pessoas: [],
+          ias: []
+        },
+          custos: []
+        })
       }
     }
 
@@ -468,32 +457,16 @@ const IndicatorForm = () => {
       return
     }
 
-    // Verifica autenticação com retry
     if (!user?.id) {
-      try {
-        // Tenta recarregar o usuário
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
-        
-        if (!currentUser?.id) {
-          setError('Usuário não autenticado. Redirecionando para login...')
-          setLoading(false)
-          setTimeout(() => navigate('/login'), 2000)
-          return
-        }
-        // Se chegou aqui, continua com currentUser (mas precisamos atualizar o contexto)
-      } catch (err) {
-        console.error('Erro ao verificar autenticação:', err)
-        setError('Erro ao verificar autenticação. Por favor, faça login novamente.')
-        setLoading(false)
-        setTimeout(() => navigate('/login'), 2000)
-        return
-      }
+      setError('Usuário não autenticado')
+      setLoading(false)
+      return
     }
 
     try {
       let indicatorIdToUse = indicatorId
 
-      // Valida se o ID é UUID válido (se não for, trata como novo indicador)
+      // Valida se o ID é UUID válido
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       const isValidUUID = indicatorId && uuidRegex.test(indicatorId)
       const shouldCreateNew = !isEditing || !isValidUUID
@@ -506,12 +479,10 @@ const IndicatorForm = () => {
         camposEspecificos: formData.camposEspecificos
       }
 
-      // Baseline data - prioriza baselineData estruturado
       const baselineDataToSave = formData.baselineData || (formData.baseline?.pessoas?.length > 0 ? {
         pessoas: formData.baseline.pessoas
       } : {})
 
-      // IA data (mantém compatibilidade)
       const iaData = {
         precisaValidacao: formData.comIA.precisaValidacao,
         pessoaEnvolvida: formData.comIA.pessoaEnvolvida || false,
@@ -519,15 +490,13 @@ const IndicatorForm = () => {
         ias: formData.comIA.ias || []
       }
 
-      // Custos data
       const custosData = {
         custos: formData.custos || []
       }
 
-      // Post-IA data
       const postIADataToSave = formData.postIAData || {}
 
-      // Se é novo indicador ou ID inválido, cria no Supabase
+      // Cria ou atualiza no Supabase
       if (shouldCreateNew) {
         const createResult = await indicatorServiceSupabase.create({
           projectId: id,
@@ -545,12 +514,10 @@ const IndicatorForm = () => {
         }
         indicatorIdToUse = createResult.indicator.id
         
-        // Se estava editando mas o ID era inválido, mostra mensagem informativa
         if (isEditing && !isValidUUID) {
           console.warn('Indicador com ID inválido foi recriado no Supabase com novo UUID')
         }
       } else {
-        // Atualiza indicador existente no Supabase (só se ID for UUID válido)
         const updateResult = await indicatorServiceSupabase.update(indicatorId, {
           info_data: infoData,
           baseline_data: baselineDataToSave,
@@ -564,25 +531,6 @@ const IndicatorForm = () => {
           setLoading(false)
           return
         }
-      }
-
-      // Também salva no localStorage para compatibilidade durante transição
-      indicatorDataService.saveInfo(indicatorIdToUse, infoData)
-      if (formData.baselineData) {
-        indicatorDataService.saveBaseline(indicatorIdToUse, {
-          baselineData: formData.baselineData
-        })
-      } else if (formData.baseline?.pessoas?.length > 0) {
-        indicatorDataService.saveBaseline(indicatorIdToUse, {
-          pessoas: formData.baseline.pessoas
-        })
-      }
-      indicatorDataService.saveIA(indicatorIdToUse, iaData)
-      indicatorDataService.saveCustos(indicatorIdToUse, custosData)
-      if (formData.postIAData) {
-        indicatorDataService.savePostIA(indicatorIdToUse, {
-          postIAData: formData.postIAData
-        })
       }
 
       navigate(`/projects/${id}/indicators`)

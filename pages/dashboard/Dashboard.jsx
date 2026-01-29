@@ -107,11 +107,46 @@ const Dashboard = () => {
     if (completeIndicators.length === 0) {
       return {
         produtividade: [],
+        capacidadeAnalitica: [],
         incrementoReceita: [],
-        outros: []
+        melhoriaMargem: [],
+        reducaoRisco: [],
+        qualidadeDecisao: [],
+        velocidade: [],
+        satisfacao: []
       }
     }
     return calcularMetricasPorTipo(completeIndicators)
+  }, [completeIndicators])
+
+  // Verifica quais tipos de indicadores existem no projeto
+  const tiposPresentes = useMemo(() => {
+    const tipos = {
+      produtividade: false,
+      capacidadeAnalitica: false,
+      incrementoReceita: false,
+      melhoriaMargem: false,
+      reducaoRisco: false,
+      qualidadeDecisao: false,
+      velocidade: false,
+      satisfacao: false
+    }
+    
+    completeIndicators.forEach(ind => {
+      const tipo = ind?.tipoIndicador || ind?.info_data?.tipoIndicador
+      if (tipo) {
+        if (tipo === 'Produtividade') tipos.produtividade = true
+        else if (tipo === 'Capacidade Analítica') tipos.capacidadeAnalitica = true
+        else if (tipo === 'Incremento Receita') tipos.incrementoReceita = true
+        else if (tipo === 'Melhoria Margem') tipos.melhoriaMargem = true
+        else if (tipo === 'Redução de Risco') tipos.reducaoRisco = true
+        else if (tipo === 'Qualidade Decisão') tipos.qualidadeDecisao = true
+        else if (tipo === 'Velocidade') tipos.velocidade = true
+        else if (tipo === 'Satisfação') tipos.satisfacao = true
+      }
+    })
+    
+    return tipos
   }, [completeIndicators])
 
   const [correlations, setCorrelations] = useState(null)
@@ -366,7 +401,7 @@ const Dashboard = () => {
       </div>
 
       {/* Gráficos Específicos por Tipo de Indicador */}
-      {metricasPorTipo.produtividade.length > 0 && (
+      {tiposPresentes.produtividade && metricasPorTipo.produtividade.length > 0 && (
         <div className="mb-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
@@ -380,7 +415,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {metricasPorTipo.incrementoReceita.length > 0 && (
+      {tiposPresentes.incrementoReceita && metricasPorTipo.incrementoReceita.length > 0 && (
         <div className="mb-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
@@ -394,42 +429,198 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Gráficos */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
-            <i className="fas fa-chart-line text-slate-400"></i>
+      {tiposPresentes.melhoriaMargem && metricasPorTipo.melhoriaMargem && metricasPorTipo.melhoriaMargem.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Melhoria de Margem
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise de otimização de custos e melhoria da margem de lucro
+            </p>
           </div>
-          <LineChart data={dadosEvolucao} />
-        </Card>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.melhoriaMargem.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-5 border border-green-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatarMoeda(metrica.ganhoMargem || 0)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ganho de margem/ano</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
-            <i className="fas fa-chart-bar text-slate-400"></i>
+      {tiposPresentes.reducaoRisco && metricasPorTipo.reducaoRisco && metricasPorTipo.reducaoRisco.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Redução de Risco
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise de riscos evitados e impactos mitigados
+            </p>
           </div>
-          <BarChart data={dadosComparacao} />
-        </Card>
-      </div>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.reducaoRisco.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-xl p-5 border border-orange-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatarMoeda(metrica.impactoEvitado || 0)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">impacto evitado/ano</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
-            <i className="fas fa-chart-bar text-slate-400"></i>
+      {tiposPresentes.capacidadeAnalitica && metricasPorTipo.capacidadeAnalitica && metricasPorTipo.capacidadeAnalitica.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Capacidade Analítica
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise do aumento na capacidade de análise e tomada de decisão
+            </p>
           </div>
-          <BarChart data={dadosEconomia} horizontal={true} />
-        </Card>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.capacidadeAnalitica.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-5 border border-blue-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrica.aumentoCapacidade || 0}%</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">aumento de capacidade</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
-            <i className="fas fa-spider text-slate-400"></i>
+      {tiposPresentes.qualidadeDecisao && metricasPorTipo.qualidadeDecisao && metricasPorTipo.qualidadeDecisao.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Qualidade de Decisão
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise da melhoria na qualidade das decisões tomadas
+            </p>
           </div>
-          <RadarChart data={dadosRadar} />
-        </Card>
-      </div>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.qualidadeDecisao.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-5 border border-purple-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">+{metrica.melhoriaQualidade || 0}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">pontos de melhoria (0-100)</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tiposPresentes.velocidade && metricasPorTipo.velocidade && metricasPorTipo.velocidade.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Velocidade
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise da redução no tempo de entrega
+            </p>
+          </div>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.velocidade.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-indigo-500/10 to-violet-500/10 rounded-xl p-5 border border-indigo-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{metrica.reducaoTempo || 0}%</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">redução no tempo</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tiposPresentes.satisfacao && metricasPorTipo.satisfacao && metricasPorTipo.satisfacao.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Satisfação
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise da melhoria na satisfação
+            </p>
+          </div>
+          <Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {metricasPorTipo.satisfacao.map((metrica, index) => (
+                <div key={index} className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 rounded-xl p-5 border border-pink-500/20">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
+                  <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">+{metrica.deltaScore || 0}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">pontos de melhoria</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Gráficos Gerais - Mostrar apenas se houver dados */}
+      {(dadosEvolucao.datasets.length > 0 || dadosComparacao.datasets.length > 0) && (
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+          {dadosEvolucao.datasets.length > 0 && (
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
+                <i className="fas fa-chart-line text-slate-400"></i>
+              </div>
+              <LineChart data={dadosEvolucao} />
+            </Card>
+          )}
+
+          {dadosComparacao.datasets.length > 0 && (
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
+                <i className="fas fa-chart-bar text-slate-400"></i>
+              </div>
+              <BarChart data={dadosComparacao} />
+            </Card>
+          )}
+        </div>
+      )}
+
+      {(dadosEconomia.datasets.length > 0 || dadosRadar.datasets.length > 0) && (
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+          {dadosEconomia.datasets.length > 0 && (
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
+                <i className="fas fa-chart-bar text-slate-400"></i>
+              </div>
+              <BarChart data={dadosEconomia} horizontal={true} />
+            </Card>
+          )}
+
+          {dadosRadar.datasets.length > 0 && (
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
+                <i className="fas fa-spider text-slate-400"></i>
+              </div>
+              <RadarChart data={dadosRadar} />
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Resumo Financeiro Detalhado */}
       <Card className="mb-8">
