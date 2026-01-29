@@ -15,6 +15,7 @@ import MelhoriaMargemCharts from '../../components/dashboard/MelhoriaMargemChart
 import ReducaoRiscoCharts from '../../components/dashboard/ReducaoRiscoCharts'
 import QualidadeDecisaoCharts from '../../components/dashboard/QualidadeDecisaoCharts'
 import VelocidadeCharts from '../../components/dashboard/VelocidadeCharts'
+import SatisfacaoCharts from '../../components/dashboard/SatisfacaoCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
@@ -520,20 +521,10 @@ const Dashboard = () => {
               Métricas de Satisfação
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Análise da melhoria na satisfação
+              Análise de impacto na satisfação do cliente, retenção e LTV
             </p>
           </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.satisfacao.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 rounded-xl p-5 border border-pink-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">+{metrica.deltaScore || 0}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">pontos de melhoria</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <SatisfacaoCharts metricas={metricasPorTipo.satisfacao} />
         </div>
       )}
 

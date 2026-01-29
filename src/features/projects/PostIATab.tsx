@@ -80,6 +80,24 @@ export const PostIATab = ({
           })),
           custoTotalImplementacao: 0
         }
+      } else if (baselineData.tipo === 'SATISFAÇÃO' && 'tipoScore' in baselineData) {
+        // Herda dados do Baseline para Satisfação
+        return {
+          tipo: 'SATISFAÇÃO',
+          scoreComIA: baselineData.scoreAtual || 0,
+          tipoScore: baselineData.tipoScore, // Herda do Baseline
+          numeroClientesEsperado: baselineData.numeroClientes || 0,
+          valorMedioPorClienteComIA: baselineData.valorMedioPorCliente || 0,
+          taxaChurnComIA: baselineData.taxaChurnAtual || 0,
+          ticketMedioSuporteComIA: baselineData.ticketMedioSuporte || 0,
+          deltaSatisfacao: 0,
+          reducaoChurn: 0,
+          valorRetencao: 0,
+          economiaSuporte: 0,
+          aumentoRevenue: 0,
+          roiSatisfacao: 0,
+          ltvIncrementado: 0
+        }
       } else if (baselineData.tipo === 'OUTROS' && 'nomeIndicador' in baselineData) {
         return {
           tipo: 'OUTROS',
@@ -171,6 +189,23 @@ export const PostIATab = ({
           valorTempoEconomizado: 0,
           ganhoProdutividade: 0,
           roiVelocidade: 0
+        }
+      case 'SATISFAÇÃO':
+        return {
+          tipo: 'SATISFAÇÃO',
+          scoreComIA: 0,
+          tipoScore: 'NPS',
+          numeroClientesEsperado: 0,
+          valorMedioPorClienteComIA: 0,
+          taxaChurnComIA: 0,
+          ticketMedioSuporteComIA: 0,
+          deltaSatisfacao: 0,
+          reducaoChurn: 0,
+          valorRetencao: 0,
+          economiaSuporte: 0,
+          aumentoRevenue: 0,
+          roiSatisfacao: 0,
+          ltvIncrementado: 0
         }
       default:
         return {
@@ -547,6 +582,62 @@ export const PostIATab = ({
     }
   }, [data, baselineData])
 
+  // Métricas calculadas para Satisfação
+  const calcularMetricasSatisfacao = useMemo(() => {
+    if (data.tipo !== 'SATISFAÇÃO' || !baselineData || baselineData.tipo !== 'SATISFAÇÃO') {
+      return {
+        deltaSatisfacao: 0,
+        reducaoChurn: 0,
+        valorRetencao: 0,
+        economiaSuporte: 0,
+        aumentoRevenue: 0,
+        roiSatisfacao: 0,
+        ltvIncrementado: 0
+      }
+    }
+
+    // 1. Delta de Satisfação
+    const deltaSatisfacao = data.scoreComIA - baselineData.scoreAtual
+
+    // 2. Redução de Churn (%)
+    const reducaoChurn = baselineData.taxaChurnAtual - data.taxaChurnComIA
+
+    // 3. Valor de Retenção (R$/ano)
+    const clientesRetidos = baselineData.numeroClientes * (reducaoChurn / 100)
+    const valorRetencao = clientesRetidos * baselineData.valorMedioPorCliente * 12
+
+    // 4. Economia com Suporte (R$/mês)
+    const ticketsEvitados = baselineData.ticketMedioSuporte - data.ticketMedioSuporteComIA
+    const custoMedioTicket = 50  // R$ (placeholder)
+    const economiaSuporte = ticketsEvitados * custoMedioTicket
+
+    // 5. Aumento de Revenue (R$/ano)
+    const aumentoRevenue = (data.numeroClientesEsperado * data.valorMedioPorClienteComIA * 12) - 
+                           (baselineData.numeroClientes * baselineData.valorMedioPorCliente * 12)
+
+    // 6. LTV Incrementado
+    const ltvAntes = baselineData.taxaChurnAtual > 0 
+      ? baselineData.valorMedioPorCliente / (baselineData.taxaChurnAtual / 100)
+      : 0
+    const ltvDepois = data.taxaChurnComIA > 0
+      ? data.valorMedioPorClienteComIA / (data.taxaChurnComIA / 100)
+      : 0
+    const ltvIncrementado = ltvDepois - ltvAntes
+
+    // 7. ROI da Satisfação (placeholder)
+    const roiSatisfacao = 0
+
+    return {
+      deltaSatisfacao,
+      reducaoChurn,
+      valorRetencao,
+      economiaSuporte,
+      aumentoRevenue,
+      roiSatisfacao,
+      ltvIncrementado
+    }
+  }, [data, baselineData])
+
   // Atualiza cálculos quando dados mudam
   useEffect(() => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -653,8 +744,32 @@ export const PostIATab = ({
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
+    } else if (data.tipo === 'SATISFAÇÃO') {
+      const metricas = calcularMetricasSatisfacao
+      const updatedData: PostIAData = {
+        ...data,
+        deltaSatisfacao: metricas.deltaSatisfacao,
+        reducaoChurn: metricas.reducaoChurn,
+        valorRetencao: metricas.valorRetencao,
+        economiaSuporte: metricas.economiaSuporte,
+        aumentoRevenue: metricas.aumentoRevenue,
+        roiSatisfacao: metricas.roiSatisfacao,
+        ltvIncrementado: metricas.ltvIncrementado
+      }
+      if (
+        updatedData.deltaSatisfacao !== data.deltaSatisfacao ||
+        updatedData.reducaoChurn !== data.reducaoChurn ||
+        updatedData.valorRetencao !== data.valorRetencao ||
+        updatedData.economiaSuporte !== data.economiaSuporte ||
+        updatedData.aumentoRevenue !== data.aumentoRevenue ||
+        updatedData.roiSatisfacao !== data.roiSatisfacao ||
+        updatedData.ltvIncrementado !== data.ltvIncrementado
+      ) {
+        setData(updatedData)
+        onPostIAChange?.(updatedData)
+      }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, data])
+  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, calcularMetricasSatisfacao, data])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -2210,6 +2325,238 @@ export const PostIATab = ({
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                   {data.roiVelocidade > 0 ? '+' : ''}{data.roiVelocidade.toFixed(1)}%
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SATISFAÇÃO */}
+      {tipoPostIA === 'SATISFAÇÃO' && data.tipo === 'SATISFAÇÃO' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+              <span className="text-2xl">😊</span>
+              Estimativas Pós-IA (Satisfação)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Score com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Score de Satisfação com IA (0-100 ou NPS)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.scoreComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      scoreComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* Tipo Score */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Tipo de Score
+                </label>
+                <input
+                  type="text"
+                  value={data.tipoScore || ''}
+                  disabled
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                  placeholder="Ex: NPS, CSAT, 0-100"
+                />
+              </div>
+
+              {/* Número de Clientes Esperado */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Número de Clientes Esperado
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formatNumberValue(data.numeroClientesEsperado)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      numeroClientesEsperado: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Valor Médio por Cliente com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Valor Médio por Cliente com IA (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.valorMedioPorClienteComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      valorMedioPorClienteComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* Taxa de Churn com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Taxa de Churn com IA (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formatNumberValue(data.taxaChurnComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      taxaChurnComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* Ticket Médio Suporte com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Ticket Médio de Suporte com IA (nº/mês)
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formatNumberValue(data.ticketMedioSuporteComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      ticketMedioSuporteComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Cards de Métricas Calculadas */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Delta Satisfação
+                </h4>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {data.deltaSatisfacao > 0 ? '+' : ''}{data.deltaSatisfacao.toFixed(1)} pts
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Redução Churn
+                </h4>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {data.reducaoChurn.toFixed(2)}%
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Valor Retenção
+                </h4>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  R$ {data.valorRetencao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Economia Suporte
+                </h4>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  R$ {data.economiaSuporte.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Aumento Revenue
+                </h4>
+                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                  R$ {data.aumentoRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  ROI Satisfação
+                </h4>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {data.roiSatisfacao > 0 ? '+' : ''}{data.roiSatisfacao.toFixed(1)}%
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border border-violet-200 dark:border-violet-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  LTV Incrementado
+                </h4>
+                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                  R$ {data.ltvIncrementado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Resumo Comparativo */}
+            <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                📊 Resumo Comparativo: Baseline vs Pós-IA
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400">Score</p>
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">
+                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? baselineData.scoreAtual.toFixed(1) : '0.00'} → {data.scoreComIA.toFixed(1)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400">Churn</p>
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">
+                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? baselineData.taxaChurnAtual.toFixed(2) : '0.00'}% → {data.taxaChurnComIA.toFixed(2)}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400">Tickets Suporte</p>
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">
+                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? baselineData.ticketMedioSuporte : '0'} → {data.ticketMedioSuporteComIA}/mês
+                  </p>
+                </div>
               </div>
             </div>
           </div>

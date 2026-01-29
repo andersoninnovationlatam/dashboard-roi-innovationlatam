@@ -702,27 +702,124 @@ export const calcularMetricasVelocidade = (indicador) => {
 export const calcularMetricasSatisfacao = (indicador) => {
   if (!indicador) return null
 
-  const baselineData = indicador.baselineData || indicador.baseline || {}
-  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const baselineData = indicador.baseline_data || indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoMapeado = tipoIndicador === 'Satisfação' ? 'SATISFAÇÃO' : tipoIndicador
   
-  if (tipoIndicador !== 'Satisfação') {
+  console.log('🔍 Debug Satisfação:', {
+    nome: infoData.nome || indicador.nome,
+    tipoIndicador,
+    tipoMapeado,
+    baselineTipo: baselineData.tipo,
+    postIATipo: postIAData.tipo
+  })
+  
+  if (tipoMapeado !== 'SATISFAÇÃO' && baselineData.tipo !== 'SATISFAÇÃO' && postIAData.tipo !== 'SATISFAÇÃO') {
+    console.log('❌ Indicador não é do tipo Satisfação')
     return null
   }
 
-  const scoreAntes = toNumber(baselineData.scoreSatisfacao || 0)
-  const scoreDepois = toNumber(postIAData.scoreSatisfacao || 0)
-  const deltaScore = scoreDepois - scoreAntes
+  // BASELINE
+  const scoreAtual = toNumber(baselineData.scoreAtual || 0)
+  const tipoScore = baselineData.tipoScore || 'NPS'
+  const numeroClientes = toNumber(baselineData.numeroClientes || 0)
+  const valorMedioPorCliente = toNumber(baselineData.valorMedioPorCliente || 0)
+  const taxaChurnAtual = toNumber(baselineData.taxaChurnAtual || 0)
+  const custoAquisicaoCliente = toNumber(baselineData.custoAquisicaoCliente || 0)
+  const ticketMedioSuporte = toNumber(baselineData.ticketMedioSuporte || 0)
 
-  return {
+  // PÓS-IA
+  const scoreComIA = toNumber(postIAData.scoreComIA || 0)
+  const numeroClientesEsperado = toNumber(postIAData.numeroClientesEsperado || 0)
+  const valorMedioPorClienteComIA = toNumber(postIAData.valorMedioPorClienteComIA || 0)
+  const taxaChurnComIA = toNumber(postIAData.taxaChurnComIA || 0)
+  const ticketMedioSuporteComIA = toNumber(postIAData.ticketMedioSuporteComIA || 0)
+
+  // Custo de Implementação
+  const custosRelacionados = indicador.custos_relacionados || indicador.custosRelacionados || {}
+  const custoImplementacao = toNumber(custosRelacionados.custoTotalImplementacao || 0)
+
+  // 1. Delta de Satisfação (pontos)
+  const deltaSatisfacao = scoreComIA - scoreAtual
+
+  // 2. Redução de Churn (%)
+  const reducaoChurn = taxaChurnAtual - taxaChurnComIA
+
+  // 3. Valor de Retenção (R$/ano)
+  const clientesRetidos = numeroClientes * (reducaoChurn / 100)
+  const valorRetencao = clientesRetidos * valorMedioPorCliente * 12
+
+  // 4. Economia com Suporte (R$/mês)
+  const ticketsEvitados = ticketMedioSuporte - ticketMedioSuporteComIA
+  const custoMedioTicket = 50  // R$ (placeholder - pode ser parametrizado)
+  const economiaSuporte = ticketsEvitados * custoMedioTicket
+
+  // 5. Aumento de Revenue (R$/ano)
+  const revenueAnualBaseline = numeroClientes * valorMedioPorCliente * 12
+  const revenueAnualComIA = numeroClientesEsperado * valorMedioPorClienteComIA * 12
+  const aumentoRevenue = revenueAnualComIA - revenueAnualBaseline
+
+  // 6. LTV (Lifetime Value) Incrementado
+  const ltvAntes = taxaChurnAtual > 0 
+    ? valorMedioPorCliente / (taxaChurnAtual / 100)
+    : 0
+  const ltvDepois = taxaChurnComIA > 0
+    ? valorMedioPorClienteComIA / (taxaChurnComIA / 100)
+    : 0
+  const ltvIncrementado = ltvDepois - ltvAntes
+
+  // 7. ROI da Satisfação (%)
+  const beneficioAnual = valorRetencao + (economiaSuporte * 12) + aumentoRevenue
+  const roiSatisfacao = custoImplementacao > 0
+    ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
+    : 0
+
+  const resultado = {
     tipo: 'SATISFAÇÃO',
     nome: infoData.nome || indicador.nome || 'Satisfação',
-    scoreAntes,
-    scoreDepois,
-    deltaScore: Math.max(0, deltaScore)
+    
+    // Baseline
+    scoreAtual,
+    tipoScore,
+    numeroClientes,
+    valorMedioPorCliente,
+    taxaChurnAtual,
+    custoAquisicaoCliente,
+    ticketMedioSuporte,
+    
+    // Pós-IA
+    scoreComIA,
+    numeroClientesEsperado,
+    valorMedioPorClienteComIA,
+    taxaChurnComIA,
+    ticketMedioSuporteComIA,
+    
+    // Métricas (7)
+    deltaSatisfacao,
+    reducaoChurn,
+    valorRetencao,
+    economiaSuporte,
+    aumentoRevenue,
+    roiSatisfacao,
+    ltvIncrementado,
+    custoImplementacao
   }
+
+  console.log('✅ Métricas Satisfação calculadas:', {
+    nome: resultado.nome,
+    deltaSatisfacao: resultado.deltaSatisfacao.toFixed(1) + ' pontos',
+    reducaoChurn: resultado.reducaoChurn.toFixed(2) + '%',
+    valorRetencao: 'R$ ' + resultado.valorRetencao.toFixed(2),
+    economiaSuporte: 'R$ ' + resultado.economiaSuporte.toFixed(2),
+    aumentoRevenue: 'R$ ' + resultado.aumentoRevenue.toFixed(2),
+    ltvIncrementado: 'R$ ' + resultado.ltvIncrementado.toFixed(2),
+    roiSatisfacao: resultado.roiSatisfacao.toFixed(2) + '%'
+  })
+
+  return resultado
 }
 
 /**

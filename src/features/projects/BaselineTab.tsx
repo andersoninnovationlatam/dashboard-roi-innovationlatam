@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { HelpCircle, Plus, Trash2 } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { 
-  IndicatorType, 
+import {
+  IndicatorType,
   BaselineData,
   INDICATOR_TYPE_INFO,
   ProdutividadePerson,
@@ -119,7 +119,12 @@ export const BaselineTab = ({
         return {
           tipo: 'SATISFAÇÃO',
           scoreAtual: 0,
-          tipoScore: 'NPS'
+          tipoScore: 'NPS',
+          numeroClientes: 0,
+          valorMedioPorCliente: 0,
+          taxaChurnAtual: 0,
+          custoAquisicaoCliente: 0,
+          ticketMedioSuporte: 0
         } as BaselineData
       default:
         return {
@@ -133,7 +138,7 @@ export const BaselineTab = ({
   // Atualiza quando baselineData ou tipoIndicador mudam externamente
   useEffect(() => {
     const novoTipo = TIPO_MAPPING[tipoIndicador] || 'PRODUTIVIDADE'
-    
+
     if (baselineData) {
       setData(baselineData)
     } else {
@@ -213,7 +218,12 @@ export const BaselineTab = ({
           setData({
             tipo: 'SATISFAÇÃO',
             scoreAtual: 0,
-            tipoScore: 'NPS'
+            tipoScore: 'NPS',
+            numeroClientes: 0,
+            valorMedioPorCliente: 0,
+            taxaChurnAtual: 0,
+            custoAquisicaoCliente: 0,
+            ticketMedioSuporte: 0
           } as BaselineData)
           break
         default:
@@ -1033,7 +1043,7 @@ export const BaselineTab = ({
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
                 Dados de Baseline - Redução de Risco
               </h3>
-              
+
               {/* Tipo de Risco */}
               <div className="mb-4">
                 <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
@@ -1227,7 +1237,7 @@ export const BaselineTab = ({
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
                 Dados de Baseline - Qualidade de Decisão
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Número de Decisões/Período */}
                 <div>
@@ -1627,7 +1637,7 @@ export const BaselineTab = ({
                     <span className="text-slate-500 dark:text-slate-400">Entregas/mês:</span>
                     <span className="ml-2 font-semibold text-slate-900 dark:text-white">
                       {(() => {
-                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1/12 : 1
+                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1 / 12 : 1
                         return (data.numeroEntregasPeriodo * fator).toFixed(0)
                       })()}
                     </span>
@@ -1636,7 +1646,7 @@ export const BaselineTab = ({
                     <span className="text-slate-500 dark:text-slate-400">Tempo total/mês:</span>
                     <span className="ml-2 font-semibold text-orange-600 dark:text-orange-400">
                       {(() => {
-                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1/12 : 1
+                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1 / 12 : 1
                         const entregasMensais = data.numeroEntregasPeriodo * fator
                         return (entregasMensais * data.tempoTrabalhoPorEntrega).toFixed(1)
                       })()} h
@@ -1646,7 +1656,7 @@ export const BaselineTab = ({
                     <span className="text-slate-500 dark:text-slate-400">Custo mão de obra:</span>
                     <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
                       R$ {(() => {
-                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1/12 : 1
+                        const fator = data.periodoEntregas === 'dia' ? 30 : data.periodoEntregas === 'semana' ? 4 : data.periodoEntregas === 'ano' ? 1 / 12 : 1
                         const entregasMensais = data.numeroEntregasPeriodo * fator
                         const horasTotais = entregasMensais * data.tempoTrabalhoPorEntrega * data.pessoasEnvolvidas
                         return (horasTotais * data.valorHoraMedio).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -1662,47 +1672,199 @@ export const BaselineTab = ({
         {/* SATISFAÇÃO */}
         {tipoBaseline === 'SATISFAÇÃO' && data.tipo === 'SATISFAÇÃO' && (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
-              <div className="mb-4">
-                <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                  Tipo de Score
-                </label>
-                <select
-                  value={data.tipoScore}
-                  onChange={(e) => {
-                    const updatedData: BaselineData = {
-                      ...data,
-                      tipoScore: e.target.value as 'NPS' | 'eNPS' | 'outro'
-                    }
-                    updateData(updatedData)
-                  }}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
-                >
-                  <option value="NPS">NPS (Net Promoter Score)</option>
-                  <option value="eNPS">eNPS (Employee Net Promoter Score)</option>
-                  <option value="outro">Outro</option>
-                </select>
+            <div className="bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border border-pink-200 dark:border-pink-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                <i className="fas fa-heart text-pink-600"></i>
+                Baseline - Satisfação do Cliente
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Score de Satisfação Atual */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Score de Satisfação Atual (0-100)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={formatNumberValue(data.scoreAtual)}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          scoreAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                      placeholder="0.0"
+                    />
+                    <select
+                      value={data.tipoScore}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          tipoScore: e.target.value as 'NPS' | 'CSAT' | 'outro'
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    >
+                      <option value="NPS">NPS</option>
+                      <option value="CSAT">CSAT</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Número de Clientes */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Número de Clientes/Usuários
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.numeroClientes)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        numeroClientes: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="0"
+                  />
+                </div>
+
+                {/* Valor Médio por Cliente */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Valor Médio por Cliente (R$/mês)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.valorMedioPorCliente)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        valorMedioPorCliente: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Taxa de Churn Atual */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Taxa de Churn Atual (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formatNumberValue(data.taxaChurnAtual)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        taxaChurnAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Percentual de clientes que cancelam por mês
+                  </p>
+                </div>
+
+                {/* Custo de Aquisição por Cliente */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Custo de Aquisição por Cliente (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.custoAquisicaoCliente)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        custoAquisicaoCliente: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    CAC - Custo para adquirir um novo cliente
+                  </p>
+                </div>
+
+                {/* Ticket Médio de Suporte */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Ticket Médio de Suporte (nº/mês)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.ticketMedioSuporte)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        ticketMedioSuporte: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Número médio de tickets de suporte por mês
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                  Score Atual (0-100)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={data.tipo === 'SATISFAÇÃO' ? formatNumberValue(data.scoreAtual) : ''}
-                  onChange={(e) => {
-                    const updatedData: BaselineData = {
-                      ...data,
-                      scoreAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                    } as BaselineData
-                    updateData(updatedData)
-                  }}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="0"
-                />
+
+              {/* Resumo Calculado */}
+              <div className="mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h4 className="text-md font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                  Resumo Baseline
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Revenue Mensal:</span>
+                    <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                      R$ {(data.numeroClientes * data.valorMedioPorCliente).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Churn/mês:</span>
+                    <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                      {(data.numeroClientes * data.taxaChurnAtual / 100).toFixed(0)} clientes
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Custo Reposição:</span>
+                    <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
+                      R$ {((data.numeroClientes * data.taxaChurnAtual / 100) * data.custoAquisicaoCliente).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
