@@ -1,0 +1,44 @@
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Dependências
+node_modules/
+/.pnp
+.pnp.js
+package-lock.json
+yarn.lock
+
+# Build
+dist/
+build/
+*.log
+*.log.*
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Vite
+.vite/
+.cache/
+
+# Testes
+coverage/
+.nyc_output/
+
+# Temporários
+*.tmp
+*.temp
+.cache/
