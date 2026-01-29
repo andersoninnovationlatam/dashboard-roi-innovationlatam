@@ -27,15 +27,15 @@ const Header = ({ onMenuClick }) => {
             >
               <i className="fas fa-bars text-xl"></i>
             </button>
-            
-            <div className="hidden md:flex items-center gap-2">
+
+            {/*<div className="hidden md:flex items-center gap-2">
               <i className="fas fa-search text-slate-400"></i>
               <input
                 type="text"
                 placeholder="Buscar projetos..."
                 className="bg-slate-100 dark:bg-slate-700 border-0 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
               />
-            </div>
+            </div>*/}
           </div>
 
           {/* Right: Actions */}
