@@ -39,7 +39,6 @@ export const DataProvider = ({ children }) => {
   }, [user])
 
   useEffect(() => {
-    // Carrega dados iniciais
     if (user?.id) {
       loadData()
     } else {
@@ -69,8 +68,8 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) return { success: false, error: 'Usuário não autenticado' }
     const result = await projectServiceSupabase.delete(id, user.id)
     if (result.success) {
-      // Remove indicadores do projeto do Supabase
-      const projectIndicators = await indicatorServiceSupabase.getByProjectId(id, user.id)
+      // Remove indicadores do projeto
+      const projectIndicators = await indicatorServiceSupabase.getByProjectId(id)
       for (const ind of projectIndicators) {
         await indicatorServiceSupabase.delete(ind.id)
       }
@@ -85,7 +84,6 @@ export const DataProvider = ({ children }) => {
       return { success: false, error: 'Usuário não autenticado' }
     }
     
-    // Usa Supabase
     const result = await indicatorServiceSupabase.create(data)
     if (result.success) {
       await loadData()
@@ -99,7 +97,6 @@ export const DataProvider = ({ children }) => {
       return { success: false, error: 'Usuário não autenticado' }
     }
     
-    // Usa Supabase
     const result = await indicatorServiceSupabase.update(id, data)
     if (result.success) {
       await loadData()
@@ -113,7 +110,6 @@ export const DataProvider = ({ children }) => {
       return { success: false, error: 'Usuário não autenticado' }
     }
     
-    // Usa Supabase
     const result = await indicatorServiceSupabase.delete(id)
     if (result.success) {
       await loadData()
@@ -129,28 +125,28 @@ export const DataProvider = ({ children }) => {
 
   const getIndicatorsByProjectId = async (projectId) => {
     if (!user?.id) {
-      console.warn('Usuário não autenticado')
       return []
     }
     
     try {
-      return await indicatorServiceSupabase.getByProjectId(projectId, user.id)
+      const supabaseIndicators = await indicatorServiceSupabase.getByProjectId(projectId)
+      return supabaseIndicators || []
     } catch (error) {
-      console.error('Erro ao buscar indicadores:', error)
+      console.error('Erro ao buscar indicadores do Supabase:', error)
       return []
     }
   }
 
   const getIndicatorById = async (id) => {
     if (!user?.id) {
-      console.warn('Usuário não autenticado')
       return null
     }
     
     try {
-      return await indicatorServiceSupabase.getCompleteById(id)
+      const completeIndicator = await indicatorServiceSupabase.getCompleteById(id)
+      return completeIndicator
     } catch (error) {
-      console.error('Erro ao buscar indicador:', error)
+      console.error('Erro ao buscar indicador do Supabase:', error)
       return null
     }
   }

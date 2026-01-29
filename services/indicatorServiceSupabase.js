@@ -89,7 +89,7 @@ export const indicatorServiceSupabase = {
 
     // Valida se é um UUID válido antes de buscar no Supabase
     if (!isValidUUID(id)) {
-      console.warn(`ID inválido (não é UUID): ${id}. Provavelmente vem do localStorage antigo.`)
+      console.warn(`ID inválido (não é UUID): ${id}`)
       return null
     }
 
@@ -126,7 +126,7 @@ export const indicatorServiceSupabase = {
 
     // Valida UUID antes de buscar
     if (!isValidUUID(id)) {
-      console.warn(`getCompleteById: ID inválido (não é UUID): ${id}. Provavelmente vem do localStorage antigo.`)
+      console.warn(`getCompleteById: ID inválido (não é UUID): ${id}`)
       return null
     }
 
@@ -220,7 +220,7 @@ export const indicatorServiceSupabase = {
 
     // Valida UUID antes de atualizar
     if (!isValidUUID(id)) {
-      console.warn(`update: ID inválido (não é UUID): ${id}. Provavelmente vem do localStorage antigo.`)
+      console.warn(`update: ID inválido (não é UUID): ${id}`)
       return { success: false, error: 'ID inválido. Indicador precisa ser recriado no Supabase.' }
     }
 
@@ -266,7 +266,7 @@ export const indicatorServiceSupabase = {
 
     // Valida UUID antes de deletar
     if (!isValidUUID(id)) {
-      console.warn(`delete: ID inválido (não é UUID): ${id}. Provavelmente vem do localStorage antigo.`)
+      console.warn(`delete: ID inválido (não é UUID): ${id}`)
       return { success: false, error: 'ID inválido. Indicador não existe no Supabase.' }
     }
 
