@@ -75,17 +75,31 @@ export interface PostIACapacidadeAnalitica {
 
 export interface PostIAMelhoriaMargem {
   tipo: 'MELHORIA MARGEM'
-  margemDepois: number
-  tipoMargem: 'percentual' | 'valor'
-  deltaMargem: number
+  receitaBrutaMensalEstimada: number    // R$
+  custoTotalMensalEstimado: number      // R$
+  margemBrutaEstimada: number           // %
+  volumeTransacoesEstimado: number      // quantidade/mês
+  // Métricas calculadas
+  deltaMargem: number                   // % (margem estimada - margem atual)
+  deltaMargemReais: number              // R$ (delta em valores absolutos)
+  economiaMensal: number                // R$
+  economiaAnual: number                 // R$
 }
 
 export interface PostIAReducaoRisco {
   tipo: 'REDUÇÃO DE RISCO'
-  probabilidadeDepois: number
-  impactoFinanceiroDepois: number
-  valorEvitadoDepois: number
-  deltaValorEvitado: number
+  probabilidadeComIA: number             // 0-100 (%)
+  impactoFinanceiroReduzido: number      // R$
+  frequenciaAvaliacaoComIA: number       // vezes por período
+  periodoAvaliacaoComIA: 'dia' | 'semana' | 'mês' | 'ano'
+  custoMitigacaoComIA: number           // R$/mês
+  // Métricas calculadas
+  reducaoProbabilidade: number          // % (prob atual - prob com IA)
+  valorRiscoEvitado: number             // R$ (diferença de exposição)
+  economiaMitigacao: number             // R$/mês (custo atual - custo com IA)
+  beneficioAnual: number                // R$ (economia + valor evitado)
+  custoVsBeneficio: number              // Razão benefício/custo
+  roiReducaoRisco: number               // % ROI
 }
 
 export interface PostIAQualidadeDecisao {

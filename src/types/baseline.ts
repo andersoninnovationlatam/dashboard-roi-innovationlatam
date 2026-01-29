@@ -68,16 +68,20 @@ export interface CapacidadeAnaliticaBaseline {
 
 export interface MelhoriaMargemBaseline {
   tipo: 'MELHORIA MARGEM'
-  margemAtual: number // % ou R$
-  margemProjetada: number // % ou R$
-  tipoMargem: 'percentual' | 'valor' // Se é % ou R$
+  receitaBrutaMensal: number        // R$
+  custoTotalMensal: number           // R$
+  margemBrutaAtual: number           // %
+  volumeTransacoes: number           // quantidade/mês
 }
 
 export interface ReducaoRiscoBaseline {
   tipo: 'REDUÇÃO DE RISCO'
-  probabilidade: number // 0-100 (%)
-  impactoFinanceiro: number // R$
-  valorEvitado: number // R$ (calculado: probabilidade * impacto)
+  tipoRisco: string                      // Descrição do tipo de risco
+  probabilidadeAtual: number             // 0-100 (%)
+  impactoFinanceiro: number              // R$
+  frequenciaAvaliacao: number            // vezes por período
+  periodoAvaliacao: 'dia' | 'semana' | 'mês' | 'ano'
+  custoMitigacaoAtual: number           // R$/mês
 }
 
 export interface QualidadeDecisaoBaseline {
@@ -143,7 +147,7 @@ export const INDICATOR_TYPE_INFO: Record<IndicatorType, IndicatorTypeInfo> = {
   },
   'MELHORIA MARGEM': {
     descricao: 'Melhoria na margem de lucro através de otimização de processos ou redução de custos.',
-    metricaPrincipal: 'Margem Atual vs Projetada (% ou R$)'
+    metricaPrincipal: 'Receita Bruta Mensal, Custo Total Mensal, Margem Bruta Atual (%), Volume de Transações'
   },
   'REDUÇÃO DE RISCO': {
     descricao: 'R$ evitados. Redução de riscos financeiros através de prevenção ou mitigação.',

@@ -112,6 +112,33 @@ export const PostIATab = ({
           ferramentas: [],
           custoTotalImplementacao: 0
         }
+      case 'MELHORIA MARGEM':
+        return {
+          tipo: 'MELHORIA MARGEM',
+          receitaBrutaMensalEstimada: 0,
+          custoTotalMensalEstimado: 0,
+          margemBrutaEstimada: 0,
+          volumeTransacoesEstimado: 0,
+          deltaMargem: 0,
+          deltaMargemReais: 0,
+          economiaMensal: 0,
+          economiaAnual: 0
+        }
+      case 'REDUÇÃO DE RISCO':
+        return {
+          tipo: 'REDUÇÃO DE RISCO',
+          probabilidadeComIA: 0,
+          impactoFinanceiroReduzido: 0,
+          frequenciaAvaliacaoComIA: 0,
+          periodoAvaliacaoComIA: 'mês',
+          custoMitigacaoComIA: 0,
+          reducaoProbabilidade: 0,
+          valorRiscoEvitado: 0,
+          economiaMitigacao: 0,
+          beneficioAnual: 0,
+          custoVsBeneficio: 0,
+          roiReducaoRisco: 0
+        }
       default:
         return {
           tipo: 'OUTROS',
@@ -282,6 +309,98 @@ export const PostIATab = ({
     return data.valorReceitaDepois - (baselineData.valorReceitaAntes || 0)
   }, [data, baselineData])
 
+  // Calcula Delta Margem (Melhoria Margem)
+  const calcularMetricasMelhoriaMargem = useMemo(() => {
+    if (data.tipo !== 'MELHORIA MARGEM' || !baselineData || baselineData.tipo !== 'MELHORIA MARGEM') {
+      return {
+        deltaMargem: 0,
+        deltaMargemReais: 0,
+        economiaMensal: 0,
+        economiaAnual: 0
+      }
+    }
+
+    // Delta Margem em percentual
+    const deltaMargem = data.margemBrutaEstimada - baselineData.margemBrutaAtual
+
+    // Lucro Bruto Baseline
+    const lucroBrutoBaseline = baselineData.receitaBrutaMensal - baselineData.custoTotalMensal
+    
+    // Lucro Bruto Estimado
+    const lucroBrutoEstimado = data.receitaBrutaMensalEstimada - data.custoTotalMensalEstimado
+    
+    // Delta Margem em Reais (diferença de lucro)
+    const deltaMargemReais = lucroBrutoEstimado - lucroBrutoBaseline
+    
+    // Economia Mensal = Delta de Custos (se custos diminuíram) + Delta de Receita (se receita aumentou)
+    const deltaCustos = baselineData.custoTotalMensal - data.custoTotalMensalEstimado
+    const deltaReceita = data.receitaBrutaMensalEstimada - baselineData.receitaBrutaMensal
+    const economiaMensal = deltaMargemReais // Pode ser positivo (ganho) ou negativo (perda)
+    
+    // Economia Anual
+    const economiaAnual = economiaMensal * 12
+
+    return {
+      deltaMargem,
+      deltaMargemReais,
+      economiaMensal,
+      economiaAnual
+    }
+  }, [data, baselineData])
+
+  // Calcula Métricas de Redução de Risco
+  const calcularMetricasReducaoRisco = useMemo(() => {
+    if (data.tipo !== 'REDUÇÃO DE RISCO' || !baselineData || baselineData.tipo !== 'REDUÇÃO DE RISCO') {
+      return {
+        reducaoProbabilidade: 0,
+        valorRiscoEvitado: 0,
+        economiaMitigacao: 0,
+        beneficioAnual: 0,
+        custoVsBeneficio: 0,
+        roiReducaoRisco: 0
+      }
+    }
+
+    // 1. Redução de Probabilidade (%)
+    const reducaoProbabilidade = baselineData.probabilidadeAtual - data.probabilidadeComIA
+
+    // 2. Valor do Risco Evitado (R$)
+    // Exposição ao risco antes vs depois
+    const exposicaoAntes = (baselineData.probabilidadeAtual / 100) * baselineData.impactoFinanceiro
+    const exposicaoDepois = (data.probabilidadeComIA / 100) * data.impactoFinanceiroReduzido
+    const valorRiscoEvitado = exposicaoAntes - exposicaoDepois
+
+    // 3. Economia em Mitigação (R$/mês)
+    const economiaMitigacao = baselineData.custoMitigacaoAtual - data.custoMitigacaoComIA
+
+    // 4. Benefício Anual (R$)
+    // Benefício = Economia de mitigação anual + Valor do risco evitado (anualizado)
+    const beneficioAnual = (economiaMitigacao * 12) + valorRiscoEvitado
+
+    // 5. Custo vs Benefício
+    // Pega o custo de implementação dos custos relacionados
+    const custosData = indicador?.custos_relacionados || indicador?.custosRelacionados || {}
+    const custoImplementacao = custosData.custoTotalImplementacao || 0
+    
+    const custoVsBeneficio = custoImplementacao > 0 
+      ? beneficioAnual / custoImplementacao 
+      : 0
+
+    // 6. ROI da Redução de Risco (%)
+    const roiReducaoRisco = custoImplementacao > 0
+      ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
+      : 0
+
+    return {
+      reducaoProbabilidade,
+      valorRiscoEvitado,
+      economiaMitigacao,
+      beneficioAnual,
+      custoVsBeneficio,
+      roiReducaoRisco
+    }
+  }, [data, baselineData])
+
   // Atualiza cálculos quando dados mudam
   useEffect(() => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -304,8 +423,26 @@ export const PostIATab = ({
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
+    } else if (data.tipo === 'MELHORIA MARGEM') {
+      const metricas = calcularMetricasMelhoriaMargem
+      const updatedData: PostIAData = {
+        ...data,
+        deltaMargem: metricas.deltaMargem,
+        deltaMargemReais: metricas.deltaMargemReais,
+        economiaMensal: metricas.economiaMensal,
+        economiaAnual: metricas.economiaAnual
+      }
+      if (
+        updatedData.deltaMargem !== data.deltaMargem ||
+        updatedData.deltaMargemReais !== data.deltaMargemReais ||
+        updatedData.economiaMensal !== data.economiaMensal ||
+        updatedData.economiaAnual !== data.economiaAnual
+      ) {
+        setData(updatedData)
+        onPostIAChange?.(updatedData)
+      }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, data])
+  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, data])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -836,6 +973,222 @@ export const PostIATab = ({
                       maximumFractionDigits: 2
                     })}
                   </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MELHORIA MARGEM */}
+      {tipoPostIA === 'MELHORIA MARGEM' && data.tipo === 'MELHORIA MARGEM' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                Dados Pós-IA - Melhoria de Margem
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Insira os valores estimados após a implementação da IA.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Receita Bruta Mensal Estimada (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formatNumberValue(data.receitaBrutaMensalEstimada)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      receitaBrutaMensalEstimada: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Custo Total Mensal Estimado (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formatNumberValue(data.custoTotalMensalEstimado)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      custoTotalMensalEstimado: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Margem Bruta Estimada (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formatNumberValue(data.margemBrutaEstimada)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      margemBrutaEstimada: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Margem Bruta = ((Receita - Custo) / Receita) × 100
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Volume de Transações/Mês Estimado
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formatNumberValue(data.volumeTransacoesEstimado)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      volumeTransacoesEstimado: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Métricas Calculadas */}
+            {baselineData && baselineData.tipo === 'MELHORIA MARGEM' && data.receitaBrutaMensalEstimada > 0 && (
+              <div className="mt-6 space-y-4">
+                {/* Delta Margem */}
+                <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        Delta Margem
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {calcularMetricasMelhoriaMargem.deltaMargem > 0 ? '+' : ''}
+                        {calcularMetricasMelhoriaMargem.deltaMargem.toFixed(2)}%
+                      </div>
+                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                        R$ {calcularMetricasMelhoriaMargem.deltaMargemReais.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Margem Estimada ({data.margemBrutaEstimada.toFixed(2)}%) - Margem Atual ({baselineData.margemBrutaAtual.toFixed(2)}%)
+                  </p>
+                </div>
+
+                {/* Economia Mensal e Anual */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        Economia Mensal
+                      </span>
+                      <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                        R$ {calcularMetricasMelhoriaMargem.economiaMensal.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        Economia Anual
+                      </span>
+                      <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                        R$ {calcularMetricasMelhoriaMargem.economiaAnual.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Comparativo Baseline vs Pós-IA */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Comparativo</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="text-slate-600 dark:text-slate-400 mb-2">Baseline</div>
+                      <div className="space-y-1">
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Receita:</span>
+                          <span className="ml-2 font-medium text-slate-900 dark:text-white">
+                            R$ {baselineData.receitaBrutaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Custo:</span>
+                          <span className="ml-2 font-medium text-slate-900 dark:text-white">
+                            R$ {baselineData.custoTotalMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Lucro:</span>
+                          <span className="ml-2 font-medium text-slate-900 dark:text-white">
+                            R$ {(baselineData.receitaBrutaMensal - baselineData.custoTotalMensal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-green-600 dark:text-green-400 mb-2">Pós-IA</div>
+                      <div className="space-y-1">
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Receita:</span>
+                          <span className="ml-2 font-medium text-green-600 dark:text-green-400">
+                            R$ {data.receitaBrutaMensalEstimada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Custo:</span>
+                          <span className="ml-2 font-medium text-green-600 dark:text-green-400">
+                            R$ {data.custoTotalMensalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Lucro:</span>
+                          <span className="ml-2 font-medium text-green-600 dark:text-green-400">
+                            R$ {(data.receitaBrutaMensalEstimada - data.custoTotalMensalEstimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
