@@ -97,8 +97,14 @@ export interface QualidadeDecisaoBaseline {
 
 export interface VelocidadeBaseline {
   tipo: 'VELOCIDADE'
-  tempoInicialProcesso: number // em minutos ou horas
-  unidadeTempo: 'minutos' | 'horas' | 'dias'
+  tempoMedioEntregaAtual: number  // dias ou horas
+  unidadeTempoEntrega: 'dias' | 'horas'
+  numeroEntregasPeriodo: number
+  periodoEntregas: 'dia' | 'semana' | 'mês' | 'ano'
+  custoPorAtraso: number  // R$ por unidade de tempo
+  pessoasEnvolvidas: number
+  valorHoraMedio: number  // R$/hora
+  tempoTrabalhoPorEntrega: number  // horas
 }
 
 export interface SatisfacaoBaseline {

@@ -121,9 +121,21 @@ export interface PostIAQualidadeDecisao {
 
 export interface PostIAVelocidade {
   tipo: 'VELOCIDADE'
-  tempoDepoisProcesso: number
-  unidadeTempo: 'minutos' | 'horas' | 'dias'
-  deltaTempo: number
+  tempoMedioEntregaComIA: number  // dias ou horas
+  unidadeTempoEntregaComIA: 'dias' | 'horas'
+  numeroEntregasPeriodoComIA: number
+  periodoEntregasComIA: 'dia' | 'semana' | 'mês' | 'ano'
+  custoPorAtrasoReduzido: number  // R$
+  pessoasEnvolvidasComIA: number
+  tempoTrabalhoPorEntregaComIA: number  // horas
+
+  // Métricas calculadas (6)
+  reducaoTempoEntrega: number      // %
+  aumentoCapacidade: number        // entregas/mês
+  economiaAtrasos: number          // R$/mês
+  valorTempoEconomizado: number    // R$
+  ganhoProdutividade: number       // %
+  roiVelocidade: number            // %
 }
 
 export interface PostIASatisfacao {

@@ -565,29 +565,135 @@ export const calcularMetricasQualidadeDecisao = (indicador) => {
 export const calcularMetricasVelocidade = (indicador) => {
   if (!indicador) return null
 
-  const baselineData = indicador.baselineData || indicador.baseline || {}
-  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const baselineData = indicador.baseline_data || indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoMapeado = tipoIndicador === 'Velocidade' ? 'VELOCIDADE' : tipoIndicador
   
-  if (tipoIndicador !== 'Velocidade') {
+  console.log('🔍 Debug Velocidade:', {
+    nome: infoData.nome || indicador.nome,
+    tipoIndicador,
+    tipoMapeado,
+    baselineTipo: baselineData.tipo,
+    postIATipo: postIAData.tipo
+  })
+  
+  if (tipoMapeado !== 'VELOCIDADE' && baselineData.tipo !== 'VELOCIDADE' && postIAData.tipo !== 'VELOCIDADE') {
+    console.log('❌ Indicador não é do tipo Velocidade')
     return null
   }
 
-  const tempoEntregaAntes = toNumber(baselineData.tempoEntrega || 0)
-  const tempoEntregaDepois = toNumber(postIAData.tempoEntrega || 0)
-  const reducaoTempo = tempoEntregaAntes > 0
-    ? ((tempoEntregaAntes - tempoEntregaDepois) / tempoEntregaAntes) * 100
+  // BASELINE
+  const tempoMedioEntregaAtual = toNumber(baselineData.tempoMedioEntregaAtual || 0)
+  const unidadeTempoEntrega = baselineData.unidadeTempoEntrega || 'dias'
+  const numeroEntregasPeriodo = toNumber(baselineData.numeroEntregasPeriodo || 0)
+  const periodoEntregas = baselineData.periodoEntregas || 'mês'
+  const custoPorAtraso = toNumber(baselineData.custoPorAtraso || 0)
+  const pessoasEnvolvidas = toNumber(baselineData.pessoasEnvolvidas || 0)
+  const valorHoraMedio = toNumber(baselineData.valorHoraMedio || 0)
+  const tempoTrabalhoPorEntrega = toNumber(baselineData.tempoTrabalhoPorEntrega || 0)
+
+  // PÓS-IA
+  const tempoMedioEntregaComIA = toNumber(postIAData.tempoMedioEntregaComIA || 0)
+  const unidadeTempoEntregaComIA = postIAData.unidadeTempoEntregaComIA || 'dias'
+  const numeroEntregasPeriodoComIA = toNumber(postIAData.numeroEntregasPeriodoComIA || 0)
+  const periodoEntregasComIA = postIAData.periodoEntregasComIA || 'mês'
+  const custoPorAtrasoReduzido = toNumber(postIAData.custoPorAtrasoReduzido || 0)
+  const pessoasEnvolvidasComIA = toNumber(postIAData.pessoasEnvolvidasComIA || 0)
+  const tempoTrabalhoPorEntregaComIA = toNumber(postIAData.tempoTrabalhoPorEntregaComIA || 0)
+
+  // Custo de Implementação
+  const custosRelacionados = indicador.custos_relacionados || indicador.custosRelacionados || {}
+  const custoImplementacao = toNumber(custosRelacionados.custoTotalImplementacao || 0)
+
+  // Normalizar entregas para mensal
+  const fatorBaseline = periodoEntregas === 'dia' ? 30 : periodoEntregas === 'semana' ? 4 : periodoEntregas === 'ano' ? 1/12 : 1
+  const fatorComIA = periodoEntregasComIA === 'dia' ? 30 : periodoEntregasComIA === 'semana' ? 4 : periodoEntregasComIA === 'ano' ? 1/12 : 1
+  
+  const entregasMensalBaseline = numeroEntregasPeriodo * fatorBaseline
+  const entregasMensalComIA = numeroEntregasPeriodoComIA * fatorComIA
+
+  // Normalizar tempo de entrega para horas
+  const tempoEntregaHorasBaseline = unidadeTempoEntrega === 'dias' ? tempoMedioEntregaAtual * 24 : tempoMedioEntregaAtual
+  const tempoEntregaHorasComIA = unidadeTempoEntregaComIA === 'dias' ? tempoMedioEntregaComIA * 24 : tempoMedioEntregaComIA
+
+  // 1. Redução de Tempo de Entrega (%)
+  const reducaoTempoEntrega = tempoEntregaHorasBaseline > 0
+    ? ((tempoEntregaHorasBaseline - tempoEntregaHorasComIA) / tempoEntregaHorasBaseline) * 100
     : 0
 
-  return {
+  // 2. Aumento de Capacidade (entregas/mês)
+  const aumentoCapacidade = entregasMensalComIA - entregasMensalBaseline
+
+  // 3. Economia com Redução de Atrasos (R$/mês)
+  const economiaAtrasos = (custoPorAtraso - custoPorAtrasoReduzido) * entregasMensalComIA
+
+  // 4. Valor do Tempo Economizado (R$)
+  const horasTotaisBaseline = entregasMensalBaseline * tempoTrabalhoPorEntrega * pessoasEnvolvidas
+  const horasTotaisComIA = entregasMensalComIA * tempoTrabalhoPorEntregaComIA * pessoasEnvolvidasComIA
+  const horasEconomizadas = horasTotaisBaseline - horasTotaisComIA
+  const valorTempoEconomizado = horasEconomizadas * valorHoraMedio
+
+  // 5. Ganho de Produtividade (%)
+  const ganhoProdutividade = entregasMensalBaseline > 0
+    ? ((entregasMensalComIA - entregasMensalBaseline) / entregasMensalBaseline) * 100
+    : 0
+
+  // 6. ROI da Velocidade (%)
+  const beneficioMensal = economiaAtrasos + valorTempoEconomizado
+  const beneficioAnual = beneficioMensal * 12
+  const roiVelocidade = custoImplementacao > 0
+    ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
+    : 0
+
+  const resultado = {
     tipo: 'VELOCIDADE',
     nome: infoData.nome || indicador.nome || 'Velocidade',
-    tempoEntregaAntes,
-    tempoEntregaDepois,
-    reducaoTempo: Math.round(reducaoTempo * 100) / 100
+    
+    // Baseline
+    tempoMedioEntregaAtual,
+    unidadeTempoEntrega,
+    numeroEntregasPeriodo,
+    periodoEntregas,
+    entregasMensalBaseline,
+    custoPorAtraso,
+    pessoasEnvolvidas,
+    valorHoraMedio,
+    tempoTrabalhoPorEntrega,
+    
+    // Pós-IA
+    tempoMedioEntregaComIA,
+    unidadeTempoEntregaComIA,
+    numeroEntregasPeriodoComIA,
+    periodoEntregasComIA,
+    entregasMensalComIA,
+    custoPorAtrasoReduzido,
+    pessoasEnvolvidasComIA,
+    tempoTrabalhoPorEntregaComIA,
+    
+    // Métricas (6)
+    reducaoTempoEntrega,
+    aumentoCapacidade,
+    economiaAtrasos,
+    valorTempoEconomizado,
+    ganhoProdutividade,
+    roiVelocidade,
+    custoImplementacao
   }
+
+  console.log('✅ Métricas Velocidade calculadas:', {
+    nome: resultado.nome,
+    reducaoTempoEntrega: resultado.reducaoTempoEntrega.toFixed(2) + '%',
+    aumentoCapacidade: resultado.aumentoCapacidade.toFixed(0),
+    economiaAtrasos: 'R$ ' + resultado.economiaAtrasos.toFixed(2),
+    valorTempoEconomizado: 'R$ ' + resultado.valorTempoEconomizado.toFixed(2),
+    ganhoProdutividade: resultado.ganhoProdutividade.toFixed(2) + '%',
+    roiVelocidade: resultado.roiVelocidade.toFixed(2) + '%'
+  })
+
+  return resultado
 }
 
 /**

@@ -14,6 +14,7 @@ import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaC
 import MelhoriaMargemCharts from '../../components/dashboard/MelhoriaMargemCharts'
 import ReducaoRiscoCharts from '../../components/dashboard/ReducaoRiscoCharts'
 import QualidadeDecisaoCharts from '../../components/dashboard/QualidadeDecisaoCharts'
+import VelocidadeCharts from '../../components/dashboard/VelocidadeCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
@@ -505,20 +506,10 @@ const Dashboard = () => {
               Métricas de Velocidade
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Análise da redução no tempo de entrega
+              Análise de ganhos em velocidade de entrega e produtividade
             </p>
           </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.velocidade.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-indigo-500/10 to-violet-500/10 rounded-xl p-5 border border-indigo-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{metrica.reducaoTempo || 0}%</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">redução no tempo</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <VelocidadeCharts metricas={metricasPorTipo.velocidade} />
         </div>
       )}
 
@@ -548,51 +539,51 @@ const Dashboard = () => {
 
       {/* Gráficos Gerais - Mostrar apenas se houver dados */}
       {(dadosEvolucao.datasets.length > 0 || dadosComparacao.datasets.length > 0) && (
-        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
           {dadosEvolucao.datasets.length > 0 && (
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
-                <i className="fas fa-chart-line text-slate-400"></i>
-              </div>
-              <LineChart data={dadosEvolucao} />
-            </Card>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
+            <i className="fas fa-chart-line text-slate-400"></i>
+          </div>
+          <LineChart data={dadosEvolucao} />
+        </Card>
           )}
 
           {dadosComparacao.datasets.length > 0 && (
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
-                <i className="fas fa-chart-bar text-slate-400"></i>
-              </div>
-              <BarChart data={dadosComparacao} />
-            </Card>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
+            <i className="fas fa-chart-bar text-slate-400"></i>
+          </div>
+          <BarChart data={dadosComparacao} />
+        </Card>
           )}
-        </div>
+      </div>
       )}
 
       {(dadosEconomia.datasets.length > 0 || dadosRadar.datasets.length > 0) && (
-        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
           {dadosEconomia.datasets.length > 0 && (
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
-                <i className="fas fa-chart-bar text-slate-400"></i>
-              </div>
-              <BarChart data={dadosEconomia} horizontal={true} />
-            </Card>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
+            <i className="fas fa-chart-bar text-slate-400"></i>
+          </div>
+          <BarChart data={dadosEconomia} horizontal={true} />
+        </Card>
           )}
 
           {dadosRadar.datasets.length > 0 && (
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
-                <i className="fas fa-spider text-slate-400"></i>
-              </div>
-              <RadarChart data={dadosRadar} />
-            </Card>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
+            <i className="fas fa-spider text-slate-400"></i>
+          </div>
+          <RadarChart data={dadosRadar} />
+        </Card>
           )}
-        </div>
+      </div>
       )}
 
       {/* Resumo Financeiro Detalhado */}

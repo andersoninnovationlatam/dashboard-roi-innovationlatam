@@ -155,6 +155,23 @@ export const PostIATab = ({
           beneficioTotalMensal: 0,
           roiMelhoria: 0
         }
+      case 'VELOCIDADE':
+        return {
+          tipo: 'VELOCIDADE',
+          tempoMedioEntregaComIA: 0,
+          unidadeTempoEntregaComIA: 'dias',
+          numeroEntregasPeriodoComIA: 0,
+          periodoEntregasComIA: 'mês',
+          custoPorAtrasoReduzido: 0,
+          pessoasEnvolvidasComIA: 0,
+          tempoTrabalhoPorEntregaComIA: 0,
+          reducaoTempoEntrega: 0,
+          aumentoCapacidade: 0,
+          economiaAtrasos: 0,
+          valorTempoEconomizado: 0,
+          ganhoProdutividade: 0,
+          roiVelocidade: 0
+        }
       default:
         return {
           tipo: 'OUTROS',
@@ -471,6 +488,65 @@ export const PostIATab = ({
     }
   }, [data, baselineData])
 
+  // Métricas calculadas para Velocidade
+  const calcularMetricasVelocidade = useMemo(() => {
+    if (data.tipo !== 'VELOCIDADE' || !baselineData || baselineData.tipo !== 'VELOCIDADE') {
+      return {
+        reducaoTempoEntrega: 0,
+        aumentoCapacidade: 0,
+        economiaAtrasos: 0,
+        valorTempoEconomizado: 0,
+        ganhoProdutividade: 0,
+        roiVelocidade: 0
+      }
+    }
+
+    // Normalizar entregas para mensal
+    const fatorBaseline = baselineData.periodoEntregas === 'dia' ? 30 : baselineData.periodoEntregas === 'semana' ? 4 : baselineData.periodoEntregas === 'ano' ? 1/12 : 1
+    const fatorComIA = data.periodoEntregasComIA === 'dia' ? 30 : data.periodoEntregasComIA === 'semana' ? 4 : data.periodoEntregasComIA === 'ano' ? 1/12 : 1
+    
+    const entregasMensalBaseline = baselineData.numeroEntregasPeriodo * fatorBaseline
+    const entregasMensalComIA = data.numeroEntregasPeriodoComIA * fatorComIA
+
+    // Normalizar tempo de entrega para horas
+    const tempoEntregaHorasBaseline = baselineData.unidadeTempoEntrega === 'dias' ? baselineData.tempoMedioEntregaAtual * 24 : baselineData.tempoMedioEntregaAtual
+    const tempoEntregaHorasComIA = data.unidadeTempoEntregaComIA === 'dias' ? data.tempoMedioEntregaComIA * 24 : data.tempoMedioEntregaComIA
+
+    // 1. Redução de Tempo de Entrega (%)
+    const reducaoTempoEntrega = tempoEntregaHorasBaseline > 0
+      ? ((tempoEntregaHorasBaseline - tempoEntregaHorasComIA) / tempoEntregaHorasBaseline) * 100
+      : 0
+
+    // 2. Aumento de Capacidade (entregas/mês)
+    const aumentoCapacidade = entregasMensalComIA - entregasMensalBaseline
+
+    // 3. Economia com Redução de Atrasos (R$/mês)
+    const economiaAtrasos = (baselineData.custoPorAtraso - data.custoPorAtrasoReduzido) * entregasMensalComIA
+
+    // 4. Valor do Tempo Economizado (R$)
+    const horasTotaisBaseline = entregasMensalBaseline * baselineData.tempoTrabalhoPorEntrega * baselineData.pessoasEnvolvidas
+    const horasTotaisComIA = entregasMensalComIA * data.tempoTrabalhoPorEntregaComIA * data.pessoasEnvolvidasComIA
+    const horasEconomizadas = horasTotaisBaseline - horasTotaisComIA
+    const valorTempoEconomizado = horasEconomizadas * baselineData.valorHoraMedio
+
+    // 5. Ganho de Produtividade (%)
+    const ganhoProdutividade = entregasMensalBaseline > 0
+      ? ((entregasMensalComIA - entregasMensalBaseline) / entregasMensalBaseline) * 100
+      : 0
+
+    // 6. ROI da Velocidade (placeholder)
+    const roiVelocidade = 0
+
+    return {
+      reducaoTempoEntrega,
+      aumentoCapacidade,
+      economiaAtrasos,
+      valorTempoEconomizado,
+      ganhoProdutividade,
+      roiVelocidade
+    }
+  }, [data, baselineData])
+
   // Atualiza cálculos quando dados mudam
   useEffect(() => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -555,8 +631,30 @@ export const PostIATab = ({
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
+    } else if (data.tipo === 'VELOCIDADE') {
+      const metricas = calcularMetricasVelocidade
+      const updatedData: PostIAData = {
+        ...data,
+        reducaoTempoEntrega: metricas.reducaoTempoEntrega,
+        aumentoCapacidade: metricas.aumentoCapacidade,
+        economiaAtrasos: metricas.economiaAtrasos,
+        valorTempoEconomizado: metricas.valorTempoEconomizado,
+        ganhoProdutividade: metricas.ganhoProdutividade,
+        roiVelocidade: metricas.roiVelocidade
+      }
+      if (
+        updatedData.reducaoTempoEntrega !== data.reducaoTempoEntrega ||
+        updatedData.aumentoCapacidade !== data.aumentoCapacidade ||
+        updatedData.economiaAtrasos !== data.economiaAtrasos ||
+        updatedData.valorTempoEconomizado !== data.valorTempoEconomizado ||
+        updatedData.ganhoProdutividade !== data.ganhoProdutividade ||
+        updatedData.roiVelocidade !== data.roiVelocidade
+      ) {
+        setData(updatedData)
+        onPostIAChange?.(updatedData)
+      }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, data])
+  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, data])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -1897,6 +1995,221 @@ export const PostIATab = ({
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VELOCIDADE */}
+      {tipoPostIA === 'VELOCIDADE' && data.tipo === 'VELOCIDADE' && baselineData && baselineData.tipo === 'VELOCIDADE' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+              <i className="fas fa-bolt text-orange-600"></i>
+              Projeção com IA - Velocidade de Entrega
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tempo Médio de Entrega com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Tempo Médio de Entrega com IA
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.tempoMedioEntregaComIA)}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        tempoMedioEntregaComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="0.00"
+                  />
+                  <select
+                    value={data.unidadeTempoEntregaComIA}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        unidadeTempoEntregaComIA: e.target.value as 'dias' | 'horas'
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="horas">horas</option>
+                    <option value="dias">dias</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Número de Entregas com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Número de Entregas por Período (Com IA)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.numeroEntregasPeriodoComIA)}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        numeroEntregasPeriodoComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="0"
+                  />
+                  <select
+                    value={data.periodoEntregasComIA}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        periodoEntregasComIA: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="dia">por dia</option>
+                    <option value="semana">por semana</option>
+                    <option value="mês">por mês</option>
+                    <option value="ano">por ano</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Custo por Atraso Reduzido */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Custo por Atraso Reduzido (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.custoPorAtrasoReduzido)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      custoPorAtrasoReduzido: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* Pessoas Envolvidas com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Pessoas Envolvidas com IA
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formatNumberValue(data.pessoasEnvolvidasComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      pessoasEnvolvidasComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Tempo de Trabalho por Entrega com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Tempo de Trabalho por Entrega com IA (horas)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.tempoTrabalhoPorEntregaComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      tempoTrabalhoPorEntregaComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Cards de Métricas Calculadas */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Redução Tempo Entrega
+                </h4>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {data.reducaoTempoEntrega.toFixed(1)}%
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Aumento Capacidade
+                </h4>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {data.aumentoCapacidade > 0 ? '+' : ''}{data.aumentoCapacidade.toFixed(0)} entregas/mês
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Economia Atrasos
+                </h4>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  R$ {data.economiaAtrasos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Valor Tempo Economizado
+                </h4>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  R$ {data.valorTempoEconomizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Ganho Produtividade
+                </h4>
+                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                  {data.ganhoProdutividade > 0 ? '+' : ''}{data.ganhoProdutividade.toFixed(1)}%
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  ROI Velocidade
+                </h4>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {data.roiVelocidade > 0 ? '+' : ''}{data.roiVelocidade.toFixed(1)}%
+                </p>
               </div>
             </div>
           </div>
