@@ -23,7 +23,7 @@ const Dashboard = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { getProjectById, getIndicatorsByProjectId, getIndicatorById, calculateProjectROI, loading } = useData()
-  
+
   const project = getProjectById(id)
   const [indicators, setIndicators] = useState([])
   const [indicatorsLoading, setIndicatorsLoading] = useState(true)
@@ -48,7 +48,7 @@ const Dashboard = () => {
 
         // Filtra IDs válidos (UUIDs) antes de buscar dados completos
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        const validIndicators = (projectIndicators || []).filter(ind => 
+        const validIndicators = (projectIndicators || []).filter(ind =>
           ind && ind.id && uuidRegex.test(ind.id)
         )
 
@@ -136,7 +136,7 @@ const Dashboard = () => {
       velocidade: false,
       satisfacao: false
     }
-    
+
     completeIndicators.forEach(ind => {
       const tipo = ind?.tipoIndicador || ind?.info_data?.tipoIndicador
       if (tipo) {
@@ -150,7 +150,7 @@ const Dashboard = () => {
         else if (tipo === 'Satisfação') tipos.satisfacao = true
       }
     })
-    
+
     return tipos
   }, [completeIndicators])
 
@@ -171,7 +171,7 @@ const Dashboard = () => {
   // Dados para gráfico de evolução financeira
   const dadosEvolucao = useMemo(() => {
     if (!metricas) return { labels: [], datasets: [] }
-    
+
     const meses = [0, 3, 6, 9, 12, 18, 24, 36]
     const economiaMensal = (metricas.economiaAnualTotal || 0) / 12
     const investimentoTotal = (metricas.custoImplementacaoTotal || 0) + (metricas.custoAnualRecorrenteTotal || 0)
@@ -220,13 +220,13 @@ const Dashboard = () => {
     if (!metricas || !metricas.indicadoresDetalhados) {
       return { labels: [], datasets: [] }
     }
-    
+
     const indicadoresComMetricas = metricas.indicadoresDetalhados.filter(item => item && item.metricas)
-    
+
     if (indicadoresComMetricas.length === 0) {
       return { labels: [], datasets: [] }
     }
-    
+
     return {
       labels: indicadoresComMetricas.map(item => item.indicador?.nome || 'Indicador'),
       datasets: [
@@ -249,22 +249,22 @@ const Dashboard = () => {
     if (!metricas || !metricas.indicadoresDetalhados) {
       return { labels: [], datasets: [] }
     }
-    
+
     const indicadoresComMetricas = metricas.indicadoresDetalhados.filter(item => item && item.metricas)
-    
+
     if (indicadoresComMetricas.length === 0) {
       return { labels: [], datasets: [] }
     }
-    
+
     return {
       labels: indicadoresComMetricas.map(item => item.indicador?.nome || 'Indicador'),
       datasets: [
         {
           label: 'Economia Anual (R$)',
           data: indicadoresComMetricas.map(item => item.metricas?.economiaAnual || 0),
-          backgroundColor: indicadoresComMetricas.map(item => 
-            (item.metricas?.economiaAnual || 0) >= 0 
-              ? 'rgba(34, 197, 94, 0.8)' 
+          backgroundColor: indicadoresComMetricas.map(item =>
+            (item.metricas?.economiaAnual || 0) >= 0
+              ? 'rgba(34, 197, 94, 0.8)'
               : 'rgba(239, 68, 68, 0.8)'
           )
         }
@@ -280,9 +280,9 @@ const Dashboard = () => {
         datasets: []
       }
     }
-    
+
     const indicadoresComMetricas = metricas.indicadoresDetalhados.filter(item => item && item.metricas)
-    
+
     if (indicadoresComMetricas.length === 0) {
       return {
         labels: ['ROI', 'Eficiência', 'Capacidade', 'Produtividade', 'Economia'],
@@ -530,51 +530,51 @@ const Dashboard = () => {
 
       {/* Gráficos Gerais - Mostrar apenas se houver dados */}
       {(dadosEvolucao.datasets.length > 0 || dadosComparacao.datasets.length > 0) && (
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
           {dadosEvolucao.datasets.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
-            <i className="fas fa-chart-line text-slate-400"></i>
-          </div>
-          <LineChart data={dadosEvolucao} />
-        </Card>
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Evolução Financeira</h3>
+                <i className="fas fa-chart-line text-slate-400"></i>
+              </div>
+              <LineChart data={dadosEvolucao} />
+            </Card>
           )}
 
           {dadosComparacao.datasets.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
-            <i className="fas fa-chart-bar text-slate-400"></i>
-          </div>
-          <BarChart data={dadosComparacao} />
-        </Card>
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Comparação Manual vs IA</h3>
+                <i className="fas fa-chart-bar text-slate-400"></i>
+              </div>
+              <BarChart data={dadosComparacao} />
+            </Card>
           )}
-      </div>
+        </div>
       )}
 
       {(dadosEconomia.datasets.length > 0 || dadosRadar.datasets.length > 0) && (
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
           {dadosEconomia.datasets.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
-            <i className="fas fa-chart-bar text-slate-400"></i>
-          </div>
-          <BarChart data={dadosEconomia} horizontal={true} />
-        </Card>
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Economia por Indicador</h3>
+                <i className="fas fa-chart-bar text-slate-400"></i>
+              </div>
+              <BarChart data={dadosEconomia} horizontal={true} />
+            </Card>
           )}
 
           {dadosRadar.datasets.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
-            <i className="fas fa-spider text-slate-400"></i>
-          </div>
-          <RadarChart data={dadosRadar} />
-        </Card>
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Métricas de Performance</h3>
+                <i className="fas fa-spider text-slate-400"></i>
+              </div>
+              <RadarChart data={dadosRadar} />
+            </Card>
           )}
-      </div>
+        </div>
       )}
 
       {/* Resumo Financeiro Detalhado */}
@@ -709,12 +709,10 @@ const Dashboard = () => {
                             {corr.strength === 'muito_fraca' && 'Correlação muito fraca'}
                           </p>
                         </div>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                          isPositive ? 'bg-blue-500/20' : 'bg-red-500/20'
-                        }`}>
-                          <i className={`fas ${isPositive ? 'fa-arrow-up' : 'fa-arrow-down'} text-xl ${
-                            isPositive ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'
-                          }`}></i>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isPositive ? 'bg-blue-500/20' : 'bg-red-500/20'
+                          }`}>
+                          <i className={`fas ${isPositive ? 'fa-arrow-up' : 'fa-arrow-down'} text-xl ${isPositive ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'
+                            }`}></i>
                         </div>
                       </div>
                     </Card>
@@ -732,20 +730,18 @@ const Dashboard = () => {
                     {correlations.insights.map((insight, index) => (
                       <div
                         key={index}
-                        className={`p-4 rounded-xl border-2 ${
-                          insight.type === 'positive'
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                            : insight.type === 'warning'
+                        className={`p-4 rounded-xl border-2 ${insight.type === 'positive'
+                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                          : insight.type === 'warning'
                             ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
                             : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-start gap-3">
-                          <i className={`fas ${
-                            insight.type === 'positive' ? 'fa-check-circle text-green-600 dark:text-green-400'
+                          <i className={`fas ${insight.type === 'positive' ? 'fa-check-circle text-green-600 dark:text-green-400'
                             : insight.type === 'warning' ? 'fa-exclamation-triangle text-yellow-600 dark:text-yellow-400'
-                            : 'fa-info-circle text-blue-600 dark:text-blue-400'
-                          } text-xl mt-1`}></i>
+                              : 'fa-info-circle text-blue-600 dark:text-blue-400'
+                            } text-xl mt-1`}></i>
                           <p className="text-slate-700 dark:text-slate-300 flex-1">
                             {insight.message}
                           </p>

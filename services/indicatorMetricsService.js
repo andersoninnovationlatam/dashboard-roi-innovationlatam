@@ -71,11 +71,8 @@ export const calcularMetricasProdutividade = (indicador) => {
     )
     const hhAntes = (toNumber(pessoaBaseline.tempoGasto) / 60) * horasPorMesAntes
 
-    // HH Depois: (tempoGasto em minutos / 60) * frequência real
-    const horasPorMesDepois = calcularHorasPorMes(
-      pessoaPostIA.frequenciaReal?.quantidade || pessoaBaseline.frequenciaReal?.quantidade || 0,
-      pessoaPostIA.frequenciaReal?.periodo || pessoaBaseline.frequenciaReal?.periodo || 'Mensal'
-    )
+    // HH Depois: usa a mesma frequência do baseline para comparar o mesmo volume de trabalho
+    const horasPorMesDepois = horasPorMesAntes
     const hhDepois = (toNumber(pessoaPostIA.tempoGasto) / 60) * horasPorMesDepois
 
     return {

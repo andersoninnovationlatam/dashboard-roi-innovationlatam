@@ -430,10 +430,8 @@ export const PostIATab = ({
         pessoaBaseline.frequenciaReal.quantidade,
         pessoaBaseline.frequenciaReal.periodo
       )
-      const horasPostIA = calcularHorasPorMes(
-        pessoaPostIA.frequenciaReal.quantidade,
-        pessoaPostIA.frequenciaReal.periodo
-      )
+      // Usa a mesma frequência do baseline para comparar o mesmo volume de trabalho
+      const horasPostIA = horasBaseline
 
       const hhAntes = (pessoaBaseline.tempoGasto / 60) * horasBaseline
       const hhDepois = (pessoaPostIA.tempoGasto / 60) * horasPostIA
