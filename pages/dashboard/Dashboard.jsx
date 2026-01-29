@@ -616,8 +616,9 @@ const Dashboard = () => {
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700">
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Indicador</th>
-                <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Tempo Manual</th>
-                <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Tempo IA</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo</th>
+                <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Métrica Baseline</th>
+                <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Métrica Pós-IA</th>
                 <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Economia/Ano</th>
                 <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">ROI</th>
                 <th className="text-right py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Payback</th>
@@ -628,11 +629,111 @@ const Dashboard = () => {
                 const m = item?.metricas || {}
                 const indicador = item?.indicador || {}
                 if (!m || !indicador) return null
+
+                // Obtém o tipo do indicador
+                const tipoIndicador = indicador.tipoIndicador || indicador.info_data?.tipoIndicador || 'N/A'
+                const tipoNormalizado = tipoIndicador.toUpperCase().replace(/[ÁÀÂÃ]/g, 'A').replace(/[ÉÊ]/g, 'E').replace(/[Í]/g, 'I').replace(/[ÓÔÕ]/g, 'O').replace(/[ÚÛ]/g, 'U')
+
+                // Busca dados de baseline e pós-IA
+                const baselineData = indicador.baselineData || indicador.baseline || indicador.baseline_data || {}
+                const postIAData = indicador.postIAData || indicador.post_ia_data || indicador.postIA || {}
+
+                // Função helper para determinar métricas baseado no tipo
+                const obterMetricasPorTipo = () => {
+                  let metricaBaseline = '-'
+                  let metricaPosIA = '-'
+
+                  switch (tipoNormalizado) {
+                    case 'PRODUTIVIDADE':
+                      // Tempo Manual | Tempo IA
+                      if (m.tempoBaselineMinutos > 0 || m.tempoComIAMinutos > 0) {
+                        metricaBaseline = `${Math.round(m.tempoBaselineMinutos || 0)} min`
+                        metricaPosIA = `${Math.round(m.tempoComIAMinutos || 0)} min`
+                      }
+                      break
+
+                    case 'INCREMENTO RECEITA':
+                      // Receita Antes | Receita Depois
+                      const receitaAntes = baselineData.valorReceitaAntes || 0
+                      const receitaDepois = postIAData.valorReceitaDepois || 0
+                      metricaBaseline = receitaAntes > 0 ? formatarMoeda(receitaAntes) : '-'
+                      metricaPosIA = receitaDepois > 0 ? formatarMoeda(receitaDepois) : '-'
+                      break
+
+                    case 'CAPACIDADE ANALITICA':
+                    case 'CAPACIDADE ANALÍTICA':
+                      // Quantidade Análises Antes | Quantidade Análises Depois
+                      const qtdAnalisesAntes = baselineData.quantidadeAnalises || 0
+                      const qtdAnalisesDepois = postIAData.quantidadeAnalises || 0
+                      metricaBaseline = qtdAnalisesAntes > 0 ? `${qtdAnalisesAntes} análises` : '-'
+                      metricaPosIA = qtdAnalisesDepois > 0 ? `${qtdAnalisesDepois} análises` : '-'
+                      break
+
+                    case 'MELHORIA MARGEM':
+                      // Margem Bruta Atual (%) | Margem Bruta Estimada (%)
+                      const margemAtual = baselineData.margemBrutaAtual || 0
+                      const margemEstimada = postIAData.margemBrutaEstimada || 0
+                      metricaBaseline = margemAtual > 0 ? `${formatarPorcentagem(margemAtual)}` : '-'
+                      metricaPosIA = margemEstimada > 0 ? `${formatarPorcentagem(margemEstimada)}` : '-'
+                      break
+
+                    case 'REDUCAO DE RISCO':
+                    case 'REDUÇÃO DE RISCO':
+                      // Probabilidade Atual (%) | Probabilidade Com IA (%)
+                      const probAtual = baselineData.probabilidadeAtual || baselineData.probabilidade || 0
+                      const probComIA = postIAData.probabilidadeComIA || postIAData.probabilidadeDepois || 0
+                      metricaBaseline = probAtual > 0 ? `${formatarPorcentagem(probAtual)}` : '-'
+                      metricaPosIA = probComIA > 0 ? `${formatarPorcentagem(probComIA)}` : '-'
+                      break
+
+                    case 'QUALIDADE DECISAO':
+                    case 'QUALIDADE DECISÃO':
+                      // Taxa Acerto Atual (%) | Taxa Acerto Com IA (%)
+                      const taxaAcertoAtual = baselineData.taxaAcertoAtual || 0
+                      const taxaAcertoComIA = postIAData.taxaAcertoComIA || 0
+                      metricaBaseline = taxaAcertoAtual > 0 ? `${formatarPorcentagem(taxaAcertoAtual)}` : '-'
+                      metricaPosIA = taxaAcertoComIA > 0 ? `${formatarPorcentagem(taxaAcertoComIA)}` : '-'
+                      break
+
+                    case 'VELOCIDADE':
+                      // Tempo Entrega Atual | Tempo Entrega Com IA
+                      const tempoEntregaAtual = baselineData.tempoMedioEntregaAtual || 0
+                      const unidadeEntrega = baselineData.unidadeTempoEntrega || 'dias'
+                      const tempoEntregaComIA = postIAData.tempoMedioEntregaComIA || 0
+                      const unidadeEntregaComIA = postIAData.unidadeTempoEntregaComIA || 'dias'
+                      metricaBaseline = tempoEntregaAtual > 0 ? `${tempoEntregaAtual} ${unidadeEntrega}` : '-'
+                      metricaPosIA = tempoEntregaComIA > 0 ? `${tempoEntregaComIA} ${unidadeEntregaComIA}` : '-'
+                      break
+
+                    case 'SATISFACAO':
+                    case 'SATISFAÇÃO':
+                      // Score Atual | Score Com IA
+                      const scoreAtual = baselineData.scoreAtual || 0
+                      const scoreComIA = postIAData.scoreComIA || 0
+                      const tipoScore = baselineData.tipoScore || 'NPS'
+                      metricaBaseline = scoreAtual > 0 ? `${scoreAtual} ${tipoScore}` : '-'
+                      metricaPosIA = scoreComIA > 0 ? `${scoreComIA} ${tipoScore}` : '-'
+                      break
+
+                    default:
+                      // Para outros tipos ou quando não há tempo específico, tenta usar tempo se disponível
+                      if (m.tempoBaselineMinutos > 0 || m.tempoComIAMinutos > 0) {
+                        metricaBaseline = `${Math.round(m.tempoBaselineMinutos || 0)} min`
+                        metricaPosIA = `${Math.round(m.tempoComIAMinutos || 0)} min`
+                      }
+                  }
+
+                  return { metricaBaseline, metricaPosIA }
+                }
+
+                const { metricaBaseline, metricaPosIA } = obterMetricasPorTipo()
+
                 return (
                   <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{indicador.nome || 'Indicador'}</td>
-                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{Math.round(m.tempoBaselineMinutos || 0)} min</td>
-                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{Math.round(m.tempoComIAMinutos || 0)} min</td>
+                    <td className="py-4 px-4 text-slate-600 dark:text-slate-400">{tipoIndicador}</td>
+                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaBaseline}</td>
+                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaPosIA}</td>
                     <td className={`py-4 px-4 text-right font-semibold ${(m.economiaAnual || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {formatarMoeda(m.economiaAnual || 0)}
                     </td>
