@@ -12,7 +12,7 @@ const ProjectOverview = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { getProjectById, getIndicatorsByProjectId, calculateProjectROI, deleteProject, loading } = useData()
-  
+
   const project = getProjectById(id)
   const [indicators, setIndicators] = useState([])
   const [metricas, setMetricas] = useState(null)
@@ -37,7 +37,7 @@ const ProjectOverview = () => {
       if (id) {
         const projectIndicators = await getIndicatorsByProjectId(id)
         setIndicators(projectIndicators)
-        
+
         if (project) {
           const projectMetricas = await calculateProjectROI(id)
           setMetricas(projectMetricas)
@@ -53,7 +53,7 @@ const ProjectOverview = () => {
       navigate(`/projects/${id}/dashboard`, { replace: true })
       return
     }
-    
+
     if (location.pathname.includes('/dashboard')) setActiveTab(0)
     // else if (location.pathname.includes('/reports')) setActiveTab(1) // Comentado - Relatórios desabilitado
     else if (location.pathname.includes('/indicators')) setActiveTab(1) // Ajustado de 2 para 1
@@ -75,8 +75,8 @@ const ProjectOverview = () => {
   }
 
   const tabs = [
-    { 
-      title: 'Dashboard', 
+    {
+      title: 'Dashboard',
       icon: 'fas fa-chart-line',
       path: `/projects/${id}/dashboard`
     },
@@ -85,8 +85,8 @@ const ProjectOverview = () => {
     //   icon: 'fas fa-file-alt',
     //   path: `/projects/${id}/reports`
     // },
-    { 
-      title: 'Indicadores', 
+    {
+      title: 'Indicadores',
       icon: 'fas fa-list',
       path: `/projects/${id}/indicators`
     }
@@ -127,7 +127,7 @@ const ProjectOverview = () => {
                   {metricas.economiaAnualTotal > 0 && (
                     <span className="text-sm font-semibold text-green-600 dark:text-green-400">
                       <i className="fas fa-piggy-bank mr-1"></i>
-                      Economia: R$ {metricas.economiaAnualTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      Economia: R$ {metricas.economiaAnualTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/ano
                     </span>
                   )}
                 </>
@@ -228,7 +228,7 @@ const ProjectOverview = () => {
             </Button>
           </div>
         </div>
-        
+
         {(project.description || project.descricao) && (
           <p className="text-slate-600 dark:text-slate-400 ml-12">
             {project.description || project.descricao}
@@ -246,11 +246,10 @@ const ProjectOverview = () => {
                 type="button"
                 role="tab"
                 onClick={() => handleTabChange(index)}
-                className={`px-6 py-3 text-base font-semibold rounded-t-lg transition-all ${
-                  index === activeTab
+                className={`px-6 py-3 text-base font-semibold rounded-t-lg transition-all ${index === activeTab
                     ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                }`}
+                  }`}
               >
                 <i className={`${tab.icon} mr-2`}></i>
                 {tab.title}
