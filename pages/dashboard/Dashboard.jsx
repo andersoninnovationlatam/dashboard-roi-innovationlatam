@@ -12,6 +12,7 @@ import RadarChart from '../../components/charts/RadarChart'
 import ProdutividadeCharts from '../../components/dashboard/ProdutividadeCharts'
 import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaCard'
 import MelhoriaMargemCharts from '../../components/dashboard/MelhoriaMargemCharts'
+import ReducaoRiscoCharts from '../../components/dashboard/ReducaoRiscoCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
@@ -451,20 +452,10 @@ const Dashboard = () => {
               Métricas de Redução de Risco
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Análise de riscos evitados e impactos mitigados
+              Análise de riscos evitados, impactos mitigados e retorno da implementação
             </p>
           </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.reducaoRisco.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-xl p-5 border border-orange-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatarMoeda(metrica.impactoEvitado || 0)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">impacto evitado/ano</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <ReducaoRiscoCharts metricas={metricasPorTipo.reducaoRisco} />
         </div>
       )}
 

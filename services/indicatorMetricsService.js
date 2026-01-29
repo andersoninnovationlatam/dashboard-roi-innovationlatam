@@ -332,30 +332,103 @@ export const calcularMetricasMelhoriaMargem = (indicador) => {
 export const calcularMetricasReducaoRisco = (indicador) => {
   if (!indicador) return null
 
-  const baselineData = indicador.baselineData || indicador.baseline || {}
-  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const baselineData = indicador.baseline_data || indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoMapeado = tipoIndicador === 'Redução de Risco' ? 'REDUÇÃO DE RISCO' : tipoIndicador
   
-  if (tipoIndicador !== 'Redução de Risco') {
+  console.log('🔍 Debug Redução de Risco:', {
+    nome: infoData.nome || indicador.nome,
+    tipoIndicador,
+    tipoMapeado,
+    baselineTipo: baselineData.tipo,
+    postIATipo: postIAData.tipo
+  })
+  
+  if (tipoMapeado !== 'REDUÇÃO DE RISCO' && baselineData.tipo !== 'REDUÇÃO DE RISCO' && postIAData.tipo !== 'REDUÇÃO DE RISCO') {
+    console.log('❌ Indicador não é do tipo Redução de Risco')
     return null
   }
 
-  const probabilidadeAntes = toNumber(baselineData.probabilidade || 0)
-  const probabilidadeDepois = toNumber(postIAData.probabilidade || 0)
-  const impactoFinanceiro = toNumber(baselineData.impactoFinanceiro || postIAData.impactoFinanceiro || 0)
-  const reducaoProbabilidade = probabilidadeAntes - probabilidadeDepois
-  const impactoEvitado = (reducaoProbabilidade / 100) * impactoFinanceiro
+  // Dados de Baseline
+  const probabilidadeAtual = toNumber(baselineData.probabilidadeAtual || baselineData.probabilidade || 0)
+  const impactoFinanceiro = toNumber(baselineData.impactoFinanceiro || 0)
+  const custoMitigacaoAtual = toNumber(baselineData.custoMitigacaoAtual || 0)
 
-  return {
+  // Dados Pós-IA
+  const probabilidadeComIA = toNumber(postIAData.probabilidadeComIA || postIAData.probabilidadeDepois || 0)
+  const impactoFinanceiroReduzido = toNumber(postIAData.impactoFinanceiroReduzido || postIAData.impactoFinanceiroDepois || impactoFinanceiro)
+  const custoMitigacaoComIA = toNumber(postIAData.custoMitigacaoComIA || custoMitigacaoAtual)
+
+  // Custo de Implementação (dos custos relacionados)
+  const custosRelacionados = indicador.custos_relacionados || indicador.custosRelacionados || {}
+  const custoImplementacao = toNumber(custosRelacionados.custoTotalImplementacao || 0)
+
+  // 1. Redução de Probabilidade (%)
+  const reducaoProbabilidade = probabilidadeAtual - probabilidadeComIA
+
+  // 2. Valor do Risco Evitado (R$)
+  // Exposição ao risco antes vs depois
+  const exposicaoAntes = (probabilidadeAtual / 100) * impactoFinanceiro
+  const exposicaoDepois = (probabilidadeComIA / 100) * impactoFinanceiroReduzido
+  const valorRiscoEvitado = exposicaoAntes - exposicaoDepois
+
+  // 3. Economia em Mitigação (R$/mês)
+  const economiaMitigacao = custoMitigacaoAtual - custoMitigacaoComIA
+
+  // 4. Benefício Anual (R$)
+  // Benefício = Economia de mitigação anual + Valor do risco evitado (anualizado)
+  const beneficioAnual = (economiaMitigacao * 12) + valorRiscoEvitado
+
+  // 5. Custo vs Benefício
+  const custoVsBeneficio = custoImplementacao > 0 
+    ? beneficioAnual / custoImplementacao 
+    : 0
+
+  // 6. ROI da Redução de Risco (%)
+  const roiReducaoRisco = custoImplementacao > 0
+    ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
+    : 0
+
+  const resultado = {
     tipo: 'REDUÇÃO DE RISCO',
     nome: infoData.nome || indicador.nome || 'Redução de Risco',
-    probabilidadeAntes,
-    probabilidadeDepois,
+    
+    // Dados Baseline
+    probabilidadeAtual,
     impactoFinanceiro,
-    impactoEvitado: Math.max(0, impactoEvitado)
+    custoMitigacaoAtual,
+    exposicaoAntes,
+    
+    // Dados Pós-IA
+    probabilidadeComIA,
+    impactoFinanceiroReduzido,
+    custoMitigacaoComIA,
+    exposicaoDepois,
+    
+    // Métricas Calculadas (6 solicitadas)
+    reducaoProbabilidade,       // % de redução
+    valorRiscoEvitado,          // R$ de risco evitado
+    economiaMitigacao,          // R$/mês economizado
+    beneficioAnual,             // R$ benefício anual total
+    custoVsBeneficio,           // Razão benefício/custo
+    roiReducaoRisco,            // % de ROI
+    custoImplementacao          // R$ investido
   }
+
+  console.log('✅ Métricas Redução de Risco calculadas:', {
+    nome: resultado.nome,
+    reducaoProbabilidade: resultado.reducaoProbabilidade,
+    valorRiscoEvitado: resultado.valorRiscoEvitado,
+    economiaMitigacao: resultado.economiaMitigacao,
+    beneficioAnual: resultado.beneficioAnual,
+    custoVsBeneficio: resultado.custoVsBeneficio,
+    roiReducaoRisco: resultado.roiReducaoRisco
+  })
+
+  return resultado
 }
 
 /**
@@ -506,6 +579,7 @@ export const calcularMetricasPorTipo = (indicators) => {
     const metricasRisco = calcularMetricasReducaoRisco(indicador)
     if (metricasRisco) {
       metricasReducaoRisco.push(metricasRisco)
+      console.log('📊 Métrica de Redução de Risco adicionada ao array')
       return
     }
 
@@ -529,6 +603,18 @@ export const calcularMetricasPorTipo = (indicators) => {
       metricasSatisfacao.push(metricasSat)
       return
     }
+  })
+
+  console.log('📈 Resultado calcularMetricasPorTipo:', {
+    totalIndicadores: indicators.length,
+    produtividade: metricasProdutividade.length,
+    capacidadeAnalitica: metricasCapacidadeAnalitica.length,
+    incrementoReceita: metricasIncrementoReceita.length,
+    melhoriaMargem: metricasMelhoriaMargem.length,
+    reducaoRisco: metricasReducaoRisco.length,
+    qualidadeDecisao: metricasQualidadeDecisao.length,
+    velocidade: metricasVelocidade.length,
+    satisfacao: metricasSatisfacao.length
   })
 
   return {

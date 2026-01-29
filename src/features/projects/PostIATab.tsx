@@ -378,9 +378,9 @@ export const PostIATab = ({
     const beneficioAnual = (economiaMitigacao * 12) + valorRiscoEvitado
 
     // 5. Custo vs Benefício
-    // Pega o custo de implementação dos custos relacionados
-    const custosData = indicador?.custos_relacionados || indicador?.custosRelacionados || {}
-    const custoImplementacao = custosData.custoTotalImplementacao || 0
+    // NOTA: O custo de implementação será calculado pelo indicatorMetricsService
+    // que tem acesso ao objeto indicador completo. Aqui usamos 0 como placeholder.
+    const custoImplementacao = 0
     
     const custoVsBeneficio = custoImplementacao > 0 
       ? beneficioAnual / custoImplementacao 
@@ -441,8 +441,30 @@ export const PostIATab = ({
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
+    } else if (data.tipo === 'REDUÇÃO DE RISCO') {
+      const metricas = calcularMetricasReducaoRisco
+      const updatedData: PostIAData = {
+        ...data,
+        reducaoProbabilidade: metricas.reducaoProbabilidade,
+        valorRiscoEvitado: metricas.valorRiscoEvitado,
+        economiaMitigacao: metricas.economiaMitigacao,
+        beneficioAnual: metricas.beneficioAnual,
+        custoVsBeneficio: metricas.custoVsBeneficio,
+        roiReducaoRisco: metricas.roiReducaoRisco
+      }
+      if (
+        updatedData.reducaoProbabilidade !== data.reducaoProbabilidade ||
+        updatedData.valorRiscoEvitado !== data.valorRiscoEvitado ||
+        updatedData.economiaMitigacao !== data.economiaMitigacao ||
+        updatedData.beneficioAnual !== data.beneficioAnual ||
+        updatedData.custoVsBeneficio !== data.custoVsBeneficio ||
+        updatedData.roiReducaoRisco !== data.roiReducaoRisco
+      ) {
+        setData(updatedData)
+        onPostIAChange?.(updatedData)
+      }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, data])
+  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, data])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -1192,6 +1214,290 @@ export const PostIATab = ({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* REDUÇÃO DE RISCO */}
+      {tipoPostIA === 'REDUÇÃO DE RISCO' && data.tipo === 'REDUÇÃO DE RISCO' && baselineData && baselineData.tipo === 'REDUÇÃO DE RISCO' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+              Projeção Pós-IA - Redução de Risco
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Probabilidade com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Probabilidade de Ocorrência com IA (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formatNumberValue(data.probabilidadeComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      probabilidadeComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Probabilidade após implementação da IA
+                </p>
+              </div>
+
+              {/* Impacto Financeiro Reduzido */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Impacto Financeiro Reduzido (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.impactoFinanceiroReduzido)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      impactoFinanceiroReduzido: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Custo estimado do risco se ocorrer (com IA)
+                </p>
+              </div>
+
+              {/* Frequência de Avaliação com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Frequência de Avaliação com IA
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.frequenciaAvaliacaoComIA)}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        frequenciaAvaliacaoComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0"
+                  />
+                  <select
+                    value={data.periodoAvaliacaoComIA}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        periodoAvaliacaoComIA: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="dia">por dia</option>
+                    <option value="semana">por semana</option>
+                    <option value="mês">por mês</option>
+                    <option value="ano">por ano</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Custo de Mitigação com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Custo de Mitigação com IA (R$/mês)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.custoMitigacaoComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      custoMitigacaoComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Custo mensal para mitigar/monitorar com IA
+                </p>
+              </div>
+            </div>
+
+            {/* Cards de Métricas Calculadas */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Redução de Probabilidade */}
+              <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Redução de Probabilidade
+                </h4>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {data.reducaoProbabilidade > 0 ? '-' : ''}{Math.abs(data.reducaoProbabilidade).toFixed(2)}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {baselineData.probabilidadeAtual.toFixed(2)}% → {data.probabilidadeComIA.toFixed(2)}%
+                </p>
+              </div>
+
+              {/* Valor do Risco Evitado */}
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Valor do Risco Evitado
+                </h4>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  R$ {data.valorRiscoEvitado.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Redução de exposição
+                </p>
+              </div>
+
+              {/* Economia em Mitigação */}
+              <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Economia em Mitigação
+                </h4>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  R$ {data.economiaMitigacao.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}/mês
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Redução de custo operacional
+                </p>
+              </div>
+
+              {/* Benefício Anual */}
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Benefício Anual
+                </h4>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  R$ {data.beneficioAnual.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Economia + Risco evitado
+                </p>
+              </div>
+
+              {/* Custo vs Benefício */}
+              <div className="p-4 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Custo vs Benefício
+                </h4>
+                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                  {data.custoVsBeneficio > 0 ? data.custoVsBeneficio.toFixed(2) : 'N/A'}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {data.custoVsBeneficio > 1 ? `${data.custoVsBeneficio.toFixed(2)}x de retorno` : 'Razão benefício/custo'}
+                </p>
+              </div>
+
+              {/* ROI da Redução de Risco */}
+              <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  ROI da Redução de Risco
+                </h4>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {data.roiReducaoRisco > 0 ? '+' : ''}{data.roiReducaoRisco.toFixed(1)}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Retorno sobre investimento
+                </p>
+              </div>
+            </div>
+
+            {/* Comparativo Baseline vs Pós-IA */}
+            <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Comparativo Baseline vs Pós-IA</h4>
+              <div className="grid grid-cols-2 gap-6 text-sm">
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 mb-2 font-medium">Baseline</div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Probabilidade:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        {baselineData.probabilidadeAtual.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Impacto:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        R$ {baselineData.impactoFinanceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Exposição:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        R$ {((baselineData.probabilidadeAtual / 100) * baselineData.impactoFinanceiro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Custo Mitigação:</span>
+                      <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
+                        R$ {baselineData.custoMitigacaoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 mb-2 font-medium">Pós-IA</div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Probabilidade:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        {data.probabilidadeComIA.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Impacto:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        R$ {data.impactoFinanceiroReduzido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Exposição:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        R$ {((data.probabilidadeComIA / 100) * data.impactoFinanceiroReduzido).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Custo Mitigação:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        R$ {data.custoMitigacaoComIA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
