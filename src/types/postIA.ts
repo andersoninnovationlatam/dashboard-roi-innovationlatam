@@ -39,6 +39,7 @@ export interface BaselineReference {
 // Dados de Pós-IA por tipo
 export interface PostIAProdutividade {
   tipo: 'PRODUTIVIDADE'
+  pessoaEnvolvida?: boolean // Campo para escolher se houve pessoa envolvida
   pessoas: PostIAProdutividadePerson[]
   custoTotalPostIA: number
   deltaProdutividade: number // Calculado: (HH Antes - HH Depois) × Valor Hora

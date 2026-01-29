@@ -18,8 +18,8 @@ const ProjectOverview = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [activeTab, setActiveTab] = useState(() => {
     if (location.pathname.includes('/dashboard')) return 0
-    if (location.pathname.includes('/reports')) return 1
-    if (location.pathname.includes('/indicators')) return 2
+    // if (location.pathname.includes('/reports')) return 1 // Comentado - Relatórios desabilitado
+    if (location.pathname.includes('/indicators')) return 1 // Ajustado de 2 para 1
     return 0
   })
 
@@ -47,8 +47,8 @@ const ProjectOverview = () => {
     }
     
     if (location.pathname.includes('/dashboard')) setActiveTab(0)
-    else if (location.pathname.includes('/reports')) setActiveTab(1)
-    else if (location.pathname.includes('/indicators')) setActiveTab(2)
+    // else if (location.pathname.includes('/reports')) setActiveTab(1) // Comentado - Relatórios desabilitado
+    else if (location.pathname.includes('/indicators')) setActiveTab(1) // Ajustado de 2 para 1
   }, [location.pathname, id, navigate])
 
   if (loading) {
@@ -72,11 +72,11 @@ const ProjectOverview = () => {
       icon: 'fas fa-chart-line',
       path: `/projects/${id}/dashboard`
     },
-    { 
-      title: 'Relatórios', 
-      icon: 'fas fa-file-alt',
-      path: `/projects/${id}/reports`
-    },
+    // { 
+    //   title: 'Relatórios', 
+    //   icon: 'fas fa-file-alt',
+    //   path: `/projects/${id}/reports`
+    // },
     { 
       title: 'Indicadores', 
       icon: 'fas fa-list',

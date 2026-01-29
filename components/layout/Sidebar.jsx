@@ -13,13 +13,13 @@ const Sidebar = ({ isOpen, onClose }) => {
       label: 'Projetos',
       path: '/projects',
       exact: false
-    },
-    {
-      icon: 'fas fa-chart-bar',
-      label: 'Relatórios',
-      path: '/reports',
-      exact: false
     }
+    // {
+    //   icon: 'fas fa-chart-bar',
+    //   label: 'Relatórios',
+    //   path: '/reports',
+    //   exact: false
+    // }
   ]
 
   const isActive = (path, exact) => {

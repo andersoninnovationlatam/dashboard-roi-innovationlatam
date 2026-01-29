@@ -57,15 +57,8 @@ export const PostIATab = ({
       if (baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData) {
         return {
           tipo: 'PRODUTIVIDADE',
-          pessoas: baselineData.pessoas.map(p => ({
-            id: p.id,
-            nome: p.nome,
-            cargo: p.cargo,
-            valorHora: p.valorHora,
-            tempoGasto: p.tempoGasto, // Usuário pode alterar
-            frequenciaReal: { ...p.frequenciaReal },
-            frequenciaDesejada: { ...p.frequenciaDesejada }
-          })),
+          pessoaEnvolvida: false,
+          pessoas: [],
           custoTotalPostIA: 0,
           deltaProdutividade: 0
         }
@@ -102,6 +95,7 @@ export const PostIATab = ({
       case 'PRODUTIVIDADE':
         return {
           tipo: 'PRODUTIVIDADE',
+          pessoaEnvolvida: false,
           pessoas: [],
           custoTotalPostIA: 0,
           deltaProdutividade: 0
@@ -177,6 +171,7 @@ export const PostIATab = ({
           
           return {
             tipo: 'PRODUTIVIDADE',
+            pessoaEnvolvida: prevData.tipo === 'PRODUTIVIDADE' ? (prevData.pessoaEnvolvida ?? false) : false,
             pessoas: novasPessoas, // Garante que todas as pessoas do baseline estão presentes
             custoTotalPostIA: prevData.tipo === 'PRODUTIVIDADE' ? prevData.custoTotalPostIA : 0,
             deltaProdutividade: prevData.tipo === 'PRODUTIVIDADE' ? prevData.deltaProdutividade : 0
@@ -372,11 +367,159 @@ export const PostIATab = ({
               </p>
             </div>
 
-            {data.pessoas.length === 0 ? (
+            {/* Seção: Pessoa Envolvida */}
+            <div className="space-y-4 p-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg mb-6">
+              <div>
+                <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
+                  Alguém foi envolvido com a IA?
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pessoaEnvolvidaPostIA"
+                      checked={data.pessoaEnvolvida === true}
+                      onChange={() => {
+                        const updatedData: PostIAData = {
+                          ...data,
+                          pessoaEnvolvida: true
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-4 h-4 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-slate-700 dark:text-slate-300">Sim</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pessoaEnvolvidaPostIA"
+                      checked={data.pessoaEnvolvida === false}
+                      onChange={() => {
+                        const updatedData: PostIAData = {
+                          ...data,
+                          pessoaEnvolvida: false,
+                          pessoas: [] // Limpa pessoas quando seleciona "Não"
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-4 h-4 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-slate-700 dark:text-slate-300">Não</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Dropdown de pessoas do Baseline (quando pessoaEnvolvida = true) */}
+              {data.pessoaEnvolvida && baselineData && baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData && (
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Selecione a(s) pessoa(s) do Baseline
+                  </label>
+                  {baselineData.pessoas.length === 0 ? (
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                        <i className="fas fa-exclamation-triangle mr-2"></i>
+                        Nenhuma pessoa cadastrada no Baseline. Adicione pessoas na aba Baseline primeiro.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {baselineData.pessoas.map((pessoaBaseline, index) => {
+                        const isSelected = data.pessoas.some(
+                          p => p.id === pessoaBaseline.id || 
+                          (p.id === undefined && p.nome === pessoaBaseline.nome)
+                        )
+
+                        return (
+                          <label
+                            key={pessoaBaseline.id || index}
+                            className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border-2 rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                            style={{
+                              borderColor: isSelected ? 'rgb(34 197 94)' : 'rgb(226 232 240)'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  // Verifica se pessoa já existe
+                                  const pessoaExistenteIndex = data.pessoas.findIndex(
+                                    p => p.id === pessoaBaseline.id || 
+                                    (p.id === undefined && p.nome === pessoaBaseline.nome)
+                                  )
+
+                                  // Cria objeto pessoa com dados do Baseline
+                                  const pessoaPostIA: PostIAProdutividadePerson = {
+                                    id: pessoaBaseline.id,
+                                    nome: pessoaBaseline.nome,
+                                    cargo: pessoaBaseline.cargo,
+                                    valorHora: pessoaBaseline.valorHora,
+                                    tempoGasto: pessoaBaseline.tempoGasto, // Usuário pode alterar
+                                    frequenciaReal: { ...pessoaBaseline.frequenciaReal },
+                                    frequenciaDesejada: { ...pessoaBaseline.frequenciaDesejada }
+                                  }
+
+                                  if (pessoaExistenteIndex >= 0) {
+                                    // Atualiza pessoa existente
+                                    const updatedPessoas = [...data.pessoas]
+                                    updatedPessoas[pessoaExistenteIndex] = pessoaPostIA
+                                    const updatedData: PostIAData = {
+                                      ...data,
+                                      pessoas: updatedPessoas
+                                    }
+                                    updateData(updatedData)
+                                  } else {
+                                    // Adiciona nova pessoa
+                                    const updatedData: PostIAData = {
+                                      ...data,
+                                      pessoas: [...data.pessoas, pessoaPostIA]
+                                    }
+                                    updateData(updatedData)
+                                  }
+                                } else {
+                                  // Remove pessoa
+                                  const updatedData: PostIAData = {
+                                    ...data,
+                                    pessoas: data.pessoas.filter(
+                                      p => p.id !== pessoaBaseline.id && 
+                                      (p.id !== undefined || p.nome !== pessoaBaseline.nome)
+                                    )
+                                  }
+                                  updateData(updatedData)
+                                }
+                              }}
+                              className="w-4 h-4 text-green-600 focus:ring-green-500 rounded"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-slate-900 dark:text-white">
+                                {pessoaBaseline.nome}
+                              </div>
+                              {pessoaBaseline.cargo && (
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                  {pessoaBaseline.cargo}
+                                </div>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <i className="fas fa-check-circle text-green-600 dark:text-green-400"></i>
+                            )}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Lista de pessoas selecionadas (editáveis) */}
+            {data.pessoaEnvolvida && data.pessoas.length === 0 ? (
               <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-8">
-                Preencha primeiro a aba Baseline para herdar os dados.
+                Selecione as pessoas do Baseline acima para começar.
               </p>
-            ) : (
+            ) : data.pessoaEnvolvida && data.pessoas.length > 0 ? (
               <div className="space-y-4">
                 {data.pessoas.map((pessoa, index) => (
                   <div
@@ -500,7 +643,7 @@ export const PostIATab = ({
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
 
             {/* Resultados Prévios */}
             {data.pessoas.length > 0 && baselineData && (
