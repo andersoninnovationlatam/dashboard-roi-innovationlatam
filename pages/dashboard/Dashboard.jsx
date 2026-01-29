@@ -330,36 +330,7 @@ const Dashboard = () => {
 
   return (
     <div>
-      {/* Gráficos Específicos por Tipo de Indicador */}
-      {metricasPorTipo.produtividade.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Produtividade
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise detalhada dos indicadores de produtividade
-            </p>
-          </div>
-          <ProdutividadeCharts metricas={metricasPorTipo.produtividade} />
-        </div>
-      )}
-
-      {metricasPorTipo.incrementoReceita.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Incremento de Receita
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise do delta de receita após implementação
-            </p>
-          </div>
-          <IncrementoReceitaCard metricas={metricasPorTipo.incrementoReceita} />
-        </div>
-      )}
-
-      {/* Cards de KPI */}
+      {/* Cards de KPI - Movidos para o topo */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
           <div className="flex items-center justify-between">
@@ -418,6 +389,35 @@ const Dashboard = () => {
           </div>
         </Card>
       </div>
+
+      {/* Gráficos Específicos por Tipo de Indicador */}
+      {metricasPorTipo.produtividade.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Produtividade
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise detalhada dos indicadores de produtividade
+            </p>
+          </div>
+          <ProdutividadeCharts metricas={metricasPorTipo.produtividade} />
+        </div>
+      )}
+
+      {metricasPorTipo.incrementoReceita.length > 0 && (
+        <div className="mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Métricas de Incremento de Receita
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              Análise do delta de receita após implementação
+            </p>
+          </div>
+          <IncrementoReceitaCard metricas={metricasPorTipo.incrementoReceita} />
+        </div>
+      )}
 
       {/* Gráficos */}
       <div className="grid gap-6 lg:grid-cols-2 mb-8">
