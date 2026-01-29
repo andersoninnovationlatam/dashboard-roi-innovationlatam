@@ -109,8 +109,13 @@ export interface VelocidadeBaseline {
 
 export interface SatisfacaoBaseline {
   tipo: 'SATISFAÇÃO'
-  scoreAtual: number // 0-100
-  tipoScore: 'NPS' | 'eNPS' | 'outro'
+  scoreAtual: number  // 0-100 (NPS, CSAT)
+  tipoScore: 'NPS' | 'CSAT' | 'outro'
+  numeroClientes: number
+  valorMedioPorCliente: number  // R$
+  taxaChurnAtual: number  // %
+  custoAquisicaoCliente: number  // R$
+  ticketMedioSuporte: number  // nº/mês
 }
 
 export type BaselineData =

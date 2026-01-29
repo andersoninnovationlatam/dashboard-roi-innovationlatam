@@ -140,9 +140,21 @@ export interface PostIAVelocidade {
 
 export interface PostIASatisfacao {
   tipo: 'SATISFAÇÃO'
-  scoreDepois: number
-  tipoScore: 'NPS' | 'eNPS' | 'outro'
-  deltaScore: number
+  scoreComIA: number  // 0-100
+  tipoScore: 'NPS' | 'CSAT' | 'outro'
+  numeroClientesEsperado: number
+  valorMedioPorClienteComIA: number  // R$
+  taxaChurnComIA: number  // %
+  ticketMedioSuporteComIA: number  // nº/mês
+
+  // Métricas calculadas (7)
+  deltaSatisfacao: number           // pontos
+  reducaoChurn: number              // %
+  valorRetencao: number             // R$/ano
+  economiaSuporte: number           // R$/mês
+  aumentoRevenue: number            // R$/ano
+  roiSatisfacao: number             // %
+  ltvIncrementado: number           // R$
 }
 
 export type PostIAData =
