@@ -92,9 +92,9 @@ export const DataProvider = ({ children }) => {
     }
   }, [user, logout])
 
-  // CRÍTICO: Revalida dados e sessão periodicamente
+  // Carrega dados inicialmente e configura subscriptions real-time
   useEffect(() => {
-    console.log('🔄 [DataContext] useEffect de revalidação executado - user?.id:', user?.id)
+    console.log('🔄 [DataContext] useEffect de inicialização executado - user?.id:', user?.id)
     if (!user?.id) {
       setProjects([])
       setIndicators([])
@@ -106,17 +106,58 @@ export const DataProvider = ({ children }) => {
     console.log('🔄 [DataContext] Primeira carga de dados...')
     loadData()
 
-    // Revalida a cada 30 segundos
-    const intervalId = setInterval(() => {
-      console.log('🔄 [DataContext] Revalidação periódica (30s) - executando loadData...')
-      loadData()
-    }, 30000) // 30 segundos
+    // Configura subscriptions real-time do Supabase
+    console.log('🔔 [DataContext] Configurando subscriptions real-time...')
+
+    // Subscription para projetos
+    const projectsChannel = supabase
+      .channel('projects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'projects',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🔔 [DataContext] Mudança detectada em projetos:', payload.eventType)
+          // Recarrega projetos quando há mudanças
+          projectServiceSupabase.getAll(user.id).then(projectsData => {
+            setProjects(projectsData || [])
+          })
+        }
+      )
+      .subscribe()
+
+    // Subscription para indicadores
+    const indicatorsChannel = supabase
+      .channel('indicators-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'indicators'
+        },
+        (payload) => {
+          console.log('🔔 [DataContext] Mudança detectada em indicadores:', payload.eventType)
+          // Recarrega indicadores quando há mudanças
+          indicatorServiceSupabase.getAll().then(indicatorsData => {
+            setIndicators(indicatorsData || [])
+          })
+        }
+      )
+      .subscribe()
 
     return () => {
-      console.log('🔄 [DataContext] Limpando intervalo de revalidação')
-      clearInterval(intervalId)
+      console.log('🔔 [DataContext] Removendo subscriptions real-time')
+      supabase.removeChannel(projectsChannel)
+      supabase.removeChannel(indicatorsChannel)
     }
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-line react-hooks/exhaustive-deps
+    // loadData não precisa estar nas dependências pois só é chamado na inicialização
+  }, [user?.id])
 
   const createProject = async (data) => {
     // Validação adicional: verifica se usuário está autenticado
