@@ -86,12 +86,13 @@ export interface ReducaoRiscoBaseline {
 
 export interface QualidadeDecisaoBaseline {
   tipo: 'QUALIDADE DECISÃO'
-  criterios: Array<{
-    id: string
-    nome: string
-    avaliacao: number // 0-100
-  }>
-  scoreMedio: number // Calculado
+  numeroDecisoesPeriodo: number           // quantidade de decisões
+  periodo: 'dia' | 'semana' | 'mês'      // período de referência
+  taxaAcertoAtual: number                 // % (0-100)
+  custoMedioDecisaoErrada: number         // R$
+  tempoMedioDecisao: number               // em minutos
+  pessoasEnvolvidas: number               // quantidade
+  valorHoraMedio: number                  // R$/hora
 }
 
 export interface VelocidadeBaseline {

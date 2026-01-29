@@ -13,6 +13,7 @@ import ProdutividadeCharts from '../../components/dashboard/ProdutividadeCharts'
 import IncrementoReceitaCard from '../../components/dashboard/IncrementoReceitaCard'
 import MelhoriaMargemCharts from '../../components/dashboard/MelhoriaMargemCharts'
 import ReducaoRiscoCharts from '../../components/dashboard/ReducaoRiscoCharts'
+import QualidadeDecisaoCharts from '../../components/dashboard/QualidadeDecisaoCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
 
@@ -490,20 +491,10 @@ const Dashboard = () => {
               Métricas de Qualidade de Decisão
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Análise da melhoria na qualidade das decisões tomadas
+              Análise de melhoria na assertividade das decisões e economia com erros evitados
             </p>
           </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.qualidadeDecisao.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-5 border border-purple-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">+{metrica.melhoriaQualidade || 0}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">pontos de melhoria (0-100)</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <QualidadeDecisaoCharts metricas={metricasPorTipo.qualidadeDecisao} />
         </div>
       )}
 

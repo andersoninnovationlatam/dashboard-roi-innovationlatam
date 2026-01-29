@@ -139,6 +139,22 @@ export const PostIATab = ({
           custoVsBeneficio: 0,
           roiReducaoRisco: 0
         }
+      case 'QUALIDADE DECISÃO':
+        return {
+          tipo: 'QUALIDADE DECISÃO',
+          numeroDecisoesPeriodoComIA: 0,
+          periodoComIA: 'mês',
+          taxaAcertoComIA: 0,
+          custoMedioDecisaoErradaComIA: 0,
+          tempoMedioDecisaoComIA: 0,
+          pessoasEnvolvidasComIA: 0,
+          melhoriaTaxaAcerto: 0,
+          economiaErrosEvitados: 0,
+          economiaTempo: 0,
+          valorTempoEconomizado: 0,
+          beneficioTotalMensal: 0,
+          roiMelhoria: 0
+        }
       default:
         return {
           tipo: 'OUTROS',
@@ -401,6 +417,60 @@ export const PostIATab = ({
     }
   }, [data, baselineData])
 
+  // Calcula Métricas de Qualidade Decisão
+  const calcularMetricasQualidadeDecisao = useMemo(() => {
+    if (data.tipo !== 'QUALIDADE DECISÃO' || !baselineData || baselineData.tipo !== 'QUALIDADE DECISÃO') {
+      return {
+        melhoriaTaxaAcerto: 0,
+        economiaErrosEvitados: 0,
+        economiaTempo: 0,
+        valorTempoEconomizado: 0,
+        beneficioTotalMensal: 0,
+        roiMelhoria: 0
+      }
+    }
+
+    // 1. Melhoria na Taxa de Acerto (%)
+    const melhoriaTaxaAcerto = data.taxaAcertoComIA - baselineData.taxaAcertoAtual
+
+    // 2. Economia com Erros Evitados (R$/mês)
+    // Normalizar decisões para mensal
+    const fatorBaseline = baselineData.periodo === 'dia' ? 30 : baselineData.periodo === 'semana' ? 4 : 1
+    const fatorComIA = data.periodoComIA === 'dia' ? 30 : data.periodoComIA === 'semana' ? 4 : 1
+    
+    const decisoesMensalBaseline = baselineData.numeroDecisoesPeriodo * fatorBaseline
+    const decisoesMensalComIA = data.numeroDecisoesPeriodoComIA * fatorComIA
+    
+    const decisoesErradasBaseline = decisoesMensalBaseline * (1 - baselineData.taxaAcertoAtual / 100)
+    const decisoesErradasComIA = decisoesMensalComIA * (1 - data.taxaAcertoComIA / 100)
+    
+    const economiaErrosEvitados = (decisoesErradasBaseline * baselineData.custoMedioDecisaoErrada) - 
+                                   (decisoesErradasComIA * data.custoMedioDecisaoErradaComIA)
+
+    // 3. Economia de Tempo (horas/mês)
+    const tempoTotalBaseline = (decisoesMensalBaseline * baselineData.tempoMedioDecisao * baselineData.pessoasEnvolvidas) / 60
+    const tempoTotalComIA = (decisoesMensalComIA * data.tempoMedioDecisaoComIA * data.pessoasEnvolvidasComIA) / 60
+    const economiaTempo = tempoTotalBaseline - tempoTotalComIA
+
+    // 4. Valor do Tempo Economizado (R$)
+    const valorTempoEconomizado = economiaTempo * baselineData.valorHoraMedio
+
+    // 5. Benefício Total Mensal (R$)
+    const beneficioTotalMensal = economiaErrosEvitados + valorTempoEconomizado
+
+    // 6. ROI (placeholder - será calculado no dashboard com custo de implementação)
+    const roiMelhoria = 0
+
+    return {
+      melhoriaTaxaAcerto,
+      economiaErrosEvitados,
+      economiaTempo,
+      valorTempoEconomizado,
+      beneficioTotalMensal,
+      roiMelhoria
+    }
+  }, [data, baselineData])
+
   // Atualiza cálculos quando dados mudam
   useEffect(() => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -463,8 +533,30 @@ export const PostIATab = ({
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
+    } else if (data.tipo === 'QUALIDADE DECISÃO') {
+      const metricas = calcularMetricasQualidadeDecisao
+      const updatedData: PostIAData = {
+        ...data,
+        melhoriaTaxaAcerto: metricas.melhoriaTaxaAcerto,
+        economiaErrosEvitados: metricas.economiaErrosEvitados,
+        economiaTempo: metricas.economiaTempo,
+        valorTempoEconomizado: metricas.valorTempoEconomizado,
+        beneficioTotalMensal: metricas.beneficioTotalMensal,
+        roiMelhoria: metricas.roiMelhoria
+      }
+      if (
+        updatedData.melhoriaTaxaAcerto !== data.melhoriaTaxaAcerto ||
+        updatedData.economiaErrosEvitados !== data.economiaErrosEvitados ||
+        updatedData.economiaTempo !== data.economiaTempo ||
+        updatedData.valorTempoEconomizado !== data.valorTempoEconomizado ||
+        updatedData.beneficioTotalMensal !== data.beneficioTotalMensal ||
+        updatedData.roiMelhoria !== data.roiMelhoria
+      ) {
+        setData(updatedData)
+        onPostIAChange?.(updatedData)
+      }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, data])
+  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, data])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
@@ -1492,6 +1584,315 @@ export const PostIATab = ({
                       <span className="text-slate-500 dark:text-slate-400">Custo Mitigação:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
                         R$ {data.custoMitigacaoComIA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUALIDADE DECISÃO */}
+      {tipoPostIA === 'QUALIDADE DECISÃO' && data.tipo === 'QUALIDADE DECISÃO' && baselineData && baselineData.tipo === 'QUALIDADE DECISÃO' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+              <i className="fas fa-brain text-purple-600"></i>
+              Projeção com IA - Qualidade de Decisão
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Número de Decisões/Período com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Número de Decisões por Período (Com IA)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.numeroDecisoesPeriodoComIA)}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        numeroDecisoesPeriodoComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="0"
+                  />
+                  <select
+                    value={data.periodoComIA}
+                    onChange={(e) => {
+                      const updatedData: PostIAData = {
+                        ...data,
+                        periodoComIA: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="dia">por dia</option>
+                    <option value="semana">por semana</option>
+                    <option value="mês">por mês</option>
+                    <option value="ano">por ano</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Taxa de Acerto com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Taxa de Acerto com IA (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formatNumberValue(data.taxaAcertoComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      taxaAcertoComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Percentual de decisões corretas estimado com IA
+                </p>
+              </div>
+
+              {/* Custo Médio de Decisão Errada com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Custo Médio de Decisão Errada com IA (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.custoMedioDecisaoErradaComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      custoMedioDecisaoErradaComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Custo financeiro quando a IA erra
+                </p>
+              </div>
+
+              {/* Tempo Médio por Decisão com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Tempo Médio por Decisão com IA (minutos)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formatNumberValue(data.tempoMedioDecisaoComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      tempoMedioDecisaoComIA: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Tempo médio para tomar cada decisão com IA
+                </p>
+              </div>
+
+              {/* Pessoas Envolvidas com IA */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                  Pessoas Envolvidas com IA
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formatNumberValue(data.pessoasEnvolvidasComIA)}
+                  onChange={(e) => {
+                    const updatedData: PostIAData = {
+                      ...data,
+                      pessoasEnvolvidasComIA: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                    }
+                    updateData(updatedData)
+                  }}
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Número de pessoas necessárias com suporte de IA
+                </p>
+              </div>
+            </div>
+
+            {/* Cards de Métricas Calculadas */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Melhoria na Taxa de Acerto */}
+              <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Melhoria Taxa Acerto
+                </h4>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {data.melhoriaTaxaAcerto > 0 ? '+' : ''}{data.melhoriaTaxaAcerto.toFixed(2)}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Aumento na assertividade
+                </p>
+              </div>
+
+              {/* Economia com Erros Evitados */}
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Economia Erros Evitados
+                </h4>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  R$ {data.economiaErrosEvitados.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Por mês
+                </p>
+              </div>
+
+              {/* Economia de Tempo */}
+              <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Economia de Tempo
+                </h4>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {data.economiaTempo.toFixed(1)}h
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Por mês
+                </p>
+              </div>
+
+              {/* Valor do Tempo Economizado */}
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Valor Tempo Economizado
+                </h4>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  R$ {data.valorTempoEconomizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Por mês
+                </p>
+              </div>
+
+              {/* Benefício Total Mensal */}
+              <div className="p-4 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Benefício Total
+                </h4>
+                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                  R$ {data.beneficioTotalMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Por mês
+                </p>
+              </div>
+
+              {/* ROI da Melhoria */}
+              <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  ROI da Melhoria
+                </h4>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {data.roiMelhoria > 0 ? '+' : ''}{data.roiMelhoria.toFixed(1)}%
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Retorno anual
+                </p>
+              </div>
+            </div>
+
+            {/* Comparativo Baseline vs Pós-IA */}
+            <div className="mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <h4 className="text-md font-semibold text-slate-700 dark:text-slate-300 mb-4">
+                Comparativo: Baseline vs Pós-IA
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 mb-2 font-medium">Baseline</div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Decisões/mês:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        {(() => {
+                          const fator = baselineData.periodo === 'dia' ? 30 : baselineData.periodo === 'semana' ? 4 : 1
+                          return (baselineData.numeroDecisoesPeriodo * fator).toFixed(0)
+                        })()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Taxa Acerto:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        {baselineData.taxaAcertoAtual.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Tempo/Decisão:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        {baselineData.tempoMedioDecisao.toFixed(1)} min
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Custo Erro:</span>
+                      <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
+                        R$ {baselineData.custoMedioDecisaoErrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 mb-2 font-medium">Pós-IA</div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Decisões/mês:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        {(() => {
+                          const fator = data.periodoComIA === 'dia' ? 30 : data.periodoComIA === 'semana' ? 4 : 1
+                          return (data.numeroDecisoesPeriodoComIA * fator).toFixed(0)
+                        })()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Taxa Acerto:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        {data.taxaAcertoComIA.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Tempo/Decisão:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        {data.tempoMedioDecisaoComIA.toFixed(1)} min
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Custo Erro:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                        R$ {data.custoMedioDecisaoErradaComIA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>

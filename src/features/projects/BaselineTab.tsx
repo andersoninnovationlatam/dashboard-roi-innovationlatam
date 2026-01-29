@@ -95,8 +95,13 @@ export const BaselineTab = ({
       case 'QUALIDADE DECISÃO':
         return {
           tipo: 'QUALIDADE DECISÃO',
-          criterios: [],
-          scoreMedio: 0
+          numeroDecisoesPeriodo: 0,
+          periodo: 'mês',
+          taxaAcertoAtual: 0,
+          custoMedioDecisaoErrada: 0,
+          tempoMedioDecisao: 0,
+          pessoasEnvolvidas: 0,
+          valorHoraMedio: 0
         } as BaselineData
       case 'VELOCIDADE':
         return {
@@ -176,8 +181,13 @@ export const BaselineTab = ({
         case 'QUALIDADE DECISÃO':
           setData({
             tipo: 'QUALIDADE DECISÃO',
-            criterios: [],
-            scoreMedio: 0
+            numeroDecisoesPeriodo: 0,
+            periodo: 'mês',
+            taxaAcertoAtual: 0,
+            custoMedioDecisaoErrada: 0,
+            tempoMedioDecisao: 0,
+            pessoasEnvolvidas: 0,
+            valorHoraMedio: 0
           } as BaselineData)
           break
         case 'VELOCIDADE':
@@ -1202,89 +1212,212 @@ export const BaselineTab = ({
         {tipoBaseline === 'QUALIDADE DECISÃO' && data.tipo === 'QUALIDADE DECISÃO' && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Critérios de Decisão
-                </h3>
-                <button
-                  type="button"
-                  onClick={addCriterio}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Adicionar Critério
-                </button>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                Dados de Baseline - Qualidade de Decisão
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Número de Decisões/Período */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Número de Decisões
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={formatNumberValue(data.numeroDecisoesPeriodo)}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          numeroDecisoesPeriodo: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="0"
+                    />
+                    <select
+                      value={data.periodo}
+                      onChange={(e) => {
+                        const updatedData: BaselineData = {
+                          ...data,
+                          periodo: e.target.value as 'dia' | 'semana' | 'mês'
+                        }
+                        updateData(updatedData)
+                      }}
+                      className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="dia">por dia</option>
+                      <option value="semana">por semana</option>
+                      <option value="mês">por mês</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Quantas decisões são tomadas
+                  </p>
+                </div>
+
+                {/* Taxa de Acerto Atual */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Taxa de Acerto Atual (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formatNumberValue(data.taxaAcertoAtual)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        taxaAcertoAtual: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Percentual de decisões corretas
+                  </p>
+                </div>
+
+                {/* Custo Médio de Decisão Errada */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Custo Médio de Decisão Errada (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.custoMedioDecisaoErrada)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        custoMedioDecisaoErrada: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Custo estimado por decisão incorreta
+                  </p>
+                </div>
+
+                {/* Tempo Médio por Decisão */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Tempo Médio por Decisão (minutos)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.tempoMedioDecisao)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        tempoMedioDecisao: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Tempo gasto por decisão
+                  </p>
+                </div>
+
+                {/* Pessoas Envolvidas */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Pessoas Envolvidas
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formatNumberValue(data.pessoasEnvolvidas)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        pessoasEnvolvidas: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Número de pessoas no processo decisório
+                  </p>
+                </div>
+
+                {/* Valor/Hora Médio */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+                    Valor/Hora Médio (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formatNumberValue(data.valorHoraMedio)}
+                    onChange={(e) => {
+                      const updatedData: BaselineData = {
+                        ...data,
+                        valorHoraMedio: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                      }
+                      updateData(updatedData)
+                    }}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Custo médio por hora das pessoas envolvidas
+                  </p>
+                </div>
               </div>
 
-              {data.criterios.length === 0 ? (
-                <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-8">
-                  Nenhum critério adicionado. Clique em "Adicionar Critério" para começar.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {data.criterios.map((criterio, index) => (
-                    <div
-                      key={criterio.id || index}
-                      className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-medium text-slate-900 dark:text-white">
-                          Critério {index + 1}
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => removeCriterio(index)}
-                          className="text-red-500 hover:text-red-700 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                            Nome do Critério
-                          </label>
-                          <input
-                            type="text"
-                            value={criterio.nome}
-                            onChange={(e) => updateCriterio(index, 'nome', e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="Nome do critério"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                            Avaliação (0-100)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={formatNumberValue(criterio.avaliacao)}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                              updateCriterio(index, 'avaliacao', val)
-                            }}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
+              {/* Resumo Calculado */}
+              {data.numeroDecisoesPeriodo > 0 && data.taxaAcertoAtual > 0 && (
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Resumo Baseline</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Decisões/{data.periodo}:</span>
+                      <span className="ml-2 font-semibold text-slate-900 dark:text-white">
+                        {data.numeroDecisoesPeriodo}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {data.criterios.length > 0 && (
-                <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      Score Médio:
-                    </span>
-                    <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {data.scoreMedio.toFixed(1)}
-                    </span>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Taxa de Acerto:</span>
+                      <span className="ml-2 font-semibold text-blue-600 dark:text-blue-400">
+                        {data.taxaAcertoAtual.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Decisões Erradas:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        {Math.round(data.numeroDecisoesPeriodo * (1 - data.taxaAcertoAtual / 100))}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Custo de Erros:</span>
+                      <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                        R$ {(Math.round(data.numeroDecisoesPeriodo * (1 - data.taxaAcertoAtual / 100)) * data.custoMedioDecisaoErrada).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}

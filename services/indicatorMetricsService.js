@@ -437,27 +437,126 @@ export const calcularMetricasReducaoRisco = (indicador) => {
 export const calcularMetricasQualidadeDecisao = (indicador) => {
   if (!indicador) return null
 
-  const baselineData = indicador.baselineData || indicador.baseline || {}
-  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  const baselineData = indicador.baseline_data || indicador.baselineData || indicador.baseline || {}
+  const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
   const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoMapeado = tipoIndicador === 'Qualidade Decisão' ? 'QUALIDADE DECISÃO' : tipoIndicador
   
-  if (tipoIndicador !== 'Qualidade Decisão') {
+  console.log('🔍 Debug Qualidade Decisão:', {
+    nome: infoData.nome || indicador.nome,
+    tipoIndicador,
+    tipoMapeado,
+    baselineTipo: baselineData.tipo,
+    postIATipo: postIAData.tipo
+  })
+  
+  if (tipoMapeado !== 'QUALIDADE DECISÃO' && baselineData.tipo !== 'QUALIDADE DECISÃO' && postIAData.tipo !== 'QUALIDADE DECISÃO') {
+    console.log('❌ Indicador não é do tipo Qualidade Decisão')
     return null
   }
 
-  const qualidadeAntes = toNumber(baselineData.scoreQualidade || 0)
-  const qualidadeDepois = toNumber(postIAData.scoreQualidade || 0)
-  const melhoriaQualidade = qualidadeDepois - qualidadeAntes
+  // Dados de Baseline
+  const numeroDecisoesPeriodo = toNumber(baselineData.numeroDecisoesPeriodo || 0)
+  const periodo = baselineData.periodo || 'mês'
+  const taxaAcertoAtual = toNumber(baselineData.taxaAcertoAtual || 0)
+  const custoMedioDecisaoErrada = toNumber(baselineData.custoMedioDecisaoErrada || 0)
+  const tempoMedioDecisao = toNumber(baselineData.tempoMedioDecisao || 0)
+  const pessoasEnvolvidas = toNumber(baselineData.pessoasEnvolvidas || 0)
+  const valorHoraMedio = toNumber(baselineData.valorHoraMedio || 0)
 
-  return {
+  // Dados Pós-IA
+  const numeroDecisoesPeriodoComIA = toNumber(postIAData.numeroDecisoesPeriodoComIA || 0)
+  const periodoComIA = postIAData.periodoComIA || 'mês'
+  const taxaAcertoComIA = toNumber(postIAData.taxaAcertoComIA || 0)
+  const custoMedioDecisaoErradaComIA = toNumber(postIAData.custoMedioDecisaoErradaComIA || 0)
+  const tempoMedioDecisaoComIA = toNumber(postIAData.tempoMedioDecisaoComIA || 0)
+  const pessoasEnvolvidasComIA = toNumber(postIAData.pessoasEnvolvidasComIA || 0)
+
+  // Custo de Implementação (dos custos relacionados)
+  const custosRelacionados = indicador.custos_relacionados || indicador.custosRelacionados || {}
+  const custoImplementacao = toNumber(custosRelacionados.custoTotalImplementacao || 0)
+
+  // Normalizar decisões para mensal
+  const fatorBaseline = periodo === 'dia' ? 30 : periodo === 'semana' ? 4 : 1
+  const fatorComIA = periodoComIA === 'dia' ? 30 : periodoComIA === 'semana' ? 4 : 1
+  
+  const decisoesMensalBaseline = numeroDecisoesPeriodo * fatorBaseline
+  const decisoesMensalComIA = numeroDecisoesPeriodoComIA * fatorComIA
+
+  // 1. Melhoria na Taxa de Acerto (%)
+  const melhoriaTaxaAcerto = taxaAcertoComIA - taxaAcertoAtual
+
+  // 2. Economia com Erros Evitados (R$/mês)
+  const decisoesErradasBaseline = decisoesMensalBaseline * (1 - taxaAcertoAtual / 100)
+  const decisoesErradasComIA = decisoesMensalComIA * (1 - taxaAcertoComIA / 100)
+  const economiaErrosEvitados = (decisoesErradasBaseline * custoMedioDecisaoErrada) - 
+                                 (decisoesErradasComIA * custoMedioDecisaoErradaComIA)
+
+  // 3. Economia de Tempo (horas/mês)
+  const tempoTotalBaseline = (decisoesMensalBaseline * tempoMedioDecisao * pessoasEnvolvidas) / 60
+  const tempoTotalComIA = (decisoesMensalComIA * tempoMedioDecisaoComIA * pessoasEnvolvidasComIA) / 60
+  const economiaTempo = tempoTotalBaseline - tempoTotalComIA
+
+  // 4. Valor do Tempo Economizado (R$)
+  const valorTempoEconomizado = economiaTempo * valorHoraMedio
+
+  // 5. Benefício Total Mensal (R$)
+  const beneficioTotalMensal = economiaErrosEvitados + valorTempoEconomizado
+
+  // 6. ROI da Melhoria (%)
+  const beneficioAnual = beneficioTotalMensal * 12
+  const roiMelhoria = custoImplementacao > 0
+    ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
+    : 0
+
+  const resultado = {
     tipo: 'QUALIDADE DECISÃO',
     nome: infoData.nome || indicador.nome || 'Qualidade de Decisão',
-    qualidadeAntes,
-    qualidadeDepois,
-    melhoriaQualidade: Math.max(0, melhoriaQualidade)
+    
+    // Dados Baseline
+    numeroDecisoesPeriodo,
+    periodo,
+    taxaAcertoAtual,
+    custoMedioDecisaoErrada,
+    tempoMedioDecisao,
+    pessoasEnvolvidas,
+    valorHoraMedio,
+    decisoesMensalBaseline,
+    decisoesErradasBaseline,
+    
+    // Dados Pós-IA
+    numeroDecisoesPeriodoComIA,
+    periodoComIA,
+    taxaAcertoComIA,
+    custoMedioDecisaoErradaComIA,
+    tempoMedioDecisaoComIA,
+    pessoasEnvolvidasComIA,
+    decisoesMensalComIA,
+    decisoesErradasComIA,
+    
+    // Métricas Calculadas (6 solicitadas)
+    melhoriaTaxaAcerto,         // % de melhoria
+    economiaErrosEvitados,      // R$/mês economizado
+    economiaTempo,              // horas/mês economizadas
+    valorTempoEconomizado,      // R$ valor do tempo
+    beneficioTotalMensal,       // R$ benefício total mensal
+    roiMelhoria,                // % de ROI
+    custoImplementacao          // R$ investido
   }
+
+  console.log('✅ Métricas Qualidade Decisão calculadas:', {
+    nome: resultado.nome,
+    melhoriaTaxaAcerto: resultado.melhoriaTaxaAcerto,
+    economiaErrosEvitados: resultado.economiaErrosEvitados,
+    economiaTempo: resultado.economiaTempo,
+    valorTempoEconomizado: resultado.valorTempoEconomizado,
+    beneficioTotalMensal: resultado.beneficioTotalMensal,
+    roiMelhoria: resultado.roiMelhoria
+  })
+
+  return resultado
 }
 
 /**
