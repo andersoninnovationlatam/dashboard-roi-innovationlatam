@@ -62,11 +62,18 @@ export const AuthProvider = ({ children }) => {
             console.log('🚪 Usuário deslogado')
             setUser(null)
           } else if (event === 'SIGNED_IN') {
-            console.log('✅ Usuário logado')
+            console.log('✅ Usuário logado - setUser chamado')
             setUser(newUser)
           } else if (event === 'TOKEN_REFRESHED') {
-            console.log('🔄 Token renovado')
-            setUser(newUser)
+            // CRÍTICO: Só atualiza se o ID do usuário realmente mudou
+            // Evita re-renders desnecessários quando apenas o token é renovado
+            if (newUser?.id !== user?.id) {
+              console.log('🔄 [AuthContext] Token renovado - ID mudou, atualizando estado')
+              setUser(newUser)
+            } else {
+              // Token renovado mas usuário é o mesmo - não atualiza para evitar re-renders
+              console.log('🔄 [AuthContext] Token renovado - mesmo usuário, ignorando atualização')
+            }
           } else if (event === 'USER_UPDATED') {
             console.log('📝 Usuário atualizado')
             setUser(newUser)

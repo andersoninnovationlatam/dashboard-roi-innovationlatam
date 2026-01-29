@@ -15,13 +15,17 @@ import { PostIATab } from '../../src/features/projects/PostIATab'
 import { TIPOS_INDICADOR, CAMPOS_POR_TIPO } from '../../config/indicatorTypes'
 
 const IndicatorForm = () => {
+  console.log('📝 [IndicatorForm] Componente renderizado')
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
   const { getProjectById, getIndicatorById } = useData()
   const { user } = useAuth()
-  
-  const project = getProjectById(id)
+
+  // Memoiza project para evitar re-renders desnecessários
+  const project = useMemo(() => getProjectById(id), [getProjectById, id])
   const isEditing = !!indicatorId
+
+  console.log('📝 [IndicatorForm] Props:', { id, indicatorId, isEditing, projectId: project?.id })
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -48,12 +52,22 @@ const IndicatorForm = () => {
   const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
+    console.log('📝 [IndicatorForm] useEffect loadIndicatorData executado - isEditing:', isEditing, 'indicatorId:', indicatorId, 'dataLoaded:', dataLoaded)
+
+    // Evita recarregar dados se já foram carregados para este indicador
+    if (dataLoaded && isEditing && indicatorId) {
+      console.log('📝 [IndicatorForm] Dados já carregados, ignorando...')
+      return
+    }
+
     const loadIndicatorData = async () => {
       if (isEditing && indicatorId) {
+        console.log('📝 [IndicatorForm] Carregando dados do indicador:', indicatorId)
         try {
           const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
-          
+
           if (completeIndicator) {
+            console.log('📝 [IndicatorForm] Indicador carregado, atualizando formData')
             // Carrega dados do Supabase
             const infoData = completeIndicator.nome ? {
               nome: completeIndicator.nome,
@@ -74,6 +88,7 @@ const IndicatorForm = () => {
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
             }))
 
+            console.log('📝 [IndicatorForm] setFormData chamado - atualizando formulário')
             setFormData({
               nome: infoData?.nome || '',
               tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
@@ -92,12 +107,16 @@ const IndicatorForm = () => {
               },
               custos: completeIndicator.custos || []
             })
+            console.log('📝 [IndicatorForm] formData atualizado com sucesso')
+            setDataLoaded(true) // Marca como carregado
           } else {
             console.warn('Indicador não encontrado no Supabase')
+            setDataLoaded(true) // Marca como carregado mesmo se não encontrado
           }
         } catch (error) {
           console.error('Erro ao carregar indicador:', error)
           setError('Erro ao carregar indicador')
+          setDataLoaded(true) // Marca como carregado mesmo com erro
         }
       } else if (!isEditing) {
         // Se não está editando, reseta o formData
@@ -111,12 +130,12 @@ const IndicatorForm = () => {
           },
           baselineData: null,
           postIAData: null,
-        comIA: {
-          precisaValidacao: false,
-          pessoaEnvolvida: false,
-          pessoas: [],
-          ias: []
-        },
+          comIA: {
+            precisaValidacao: false,
+            pessoaEnvolvida: false,
+            pessoas: [],
+            ias: []
+          },
           custos: []
         })
       }
@@ -124,6 +143,11 @@ const IndicatorForm = () => {
 
     loadIndicatorData()
   }, [indicatorId, isEditing])
+
+  // Reseta dataLoaded quando indicatorId muda
+  useEffect(() => {
+    setDataLoaded(false)
+  }, [indicatorId])
 
   const handleChange = (section, field, value) => {
     if (section) {
@@ -154,14 +178,14 @@ const IndicatorForm = () => {
 
   const handleTipoIndicadorChange = (tipo) => {
     const novoCamposConfig = CAMPOS_POR_TIPO[tipo] || CAMPOS_POR_TIPO['Produtividade']
-    
+
     // Função para limpar campos irrelevantes de uma pessoa
     const limparCamposPessoa = (pessoa) => {
       const pessoaLimpa = {
         nome: pessoa.nome || '',
         funcao: pessoa.funcao || ''
       }
-      
+
       if (novoCamposConfig.baseline.mostraValorHora) pessoaLimpa.valorHora = pessoa.valorHora || ''
       if (novoCamposConfig.baseline.mostraTempoOperacao) pessoaLimpa.tempoOperacao = pessoa.tempoOperacao || ''
       if (novoCamposConfig.baseline.mostraTempoEntrega) pessoaLimpa.tempoEntrega = pessoa.tempoEntrega || ''
@@ -171,10 +195,10 @@ const IndicatorForm = () => {
       }
       if (novoCamposConfig.baseline.mostraValorPorAnalise) pessoaLimpa.valorPorAnalise = pessoa.valorPorAnalise || ''
       if (novoCamposConfig.baseline.mostraImpactoEvitado) pessoaLimpa.impactoEvitado = pessoa.impactoEvitado || ''
-      
+
       return pessoaLimpa
     }
-    
+
     // Função para limpar campos irrelevantes de uma IA
     const limparCamposIA = (ia) => {
       const iaLimpa = {
@@ -184,7 +208,7 @@ const IndicatorForm = () => {
         taxaErro: ia.taxaErro || '',
         custoPorOperacao: ia.custoPorOperacao || ''
       }
-      
+
       if (novoCamposConfig.ia.mostraTempoExecucao) iaLimpa.tempoExecucao = ia.tempoExecucao || ''
       if (novoCamposConfig.ia.mostraQuantidadeOperacoes) {
         iaLimpa.quantidadeOperacoes = ia.quantidadeOperacoes || ''
@@ -192,10 +216,10 @@ const IndicatorForm = () => {
       }
       if (novoCamposConfig.ia.mostraValorPorAnalise) iaLimpa.valorPorAnalise = ia.valorPorAnalise || ''
       if (novoCamposConfig.ia.mostraImpactoEvitado) iaLimpa.impactoEvitado = ia.impactoEvitado || ''
-      
+
       return iaLimpa
     }
-    
+
     setFormData(prev => ({
       ...prev,
       tipoIndicador: tipo,
@@ -226,7 +250,7 @@ const IndicatorForm = () => {
       nome: '',
       funcao: ''
     }
-    
+
     if (camposConfig.baseline.mostraValorHora) novaPessoa.valorHora = ''
     if (camposConfig.baseline.mostraTempoOperacao) novaPessoa.tempoOperacao = ''
     if (camposConfig.baseline.mostraTempoEntrega) novaPessoa.tempoEntrega = ''
@@ -236,7 +260,7 @@ const IndicatorForm = () => {
     }
     if (camposConfig.baseline.mostraValorPorAnalise) novaPessoa.valorPorAnalise = ''
     if (camposConfig.baseline.mostraImpactoEvitado) novaPessoa.impactoEvitado = ''
-    
+
     setFormData(prev => ({
       ...prev,
       baseline: {
@@ -281,7 +305,7 @@ const IndicatorForm = () => {
       nome: '',
       funcao: ''
     }
-    
+
     if (camposConfig.baseline.mostraValorHora) novaPessoa.valorHora = ''
     if (camposConfig.baseline.mostraTempoOperacao) novaPessoa.tempoOperacao = ''
     if (camposConfig.baseline.mostraTempoEntrega) novaPessoa.tempoEntrega = ''
@@ -291,7 +315,7 @@ const IndicatorForm = () => {
     }
     if (camposConfig.baseline.mostraValorPorAnalise) novaPessoa.valorPorAnalise = ''
     if (camposConfig.baseline.mostraImpactoEvitado) novaPessoa.impactoEvitado = ''
-    
+
     setFormData(prev => ({
       ...prev,
       comIA: {
@@ -339,7 +363,7 @@ const IndicatorForm = () => {
       taxaErro: '',
       custoPorOperacao: ''
     }
-    
+
     if (camposConfig.ia.mostraTempoExecucao) novaIA.tempoExecucao = ''
     if (camposConfig.ia.mostraQuantidadeOperacoes) {
       novaIA.quantidadeOperacoes = ''
@@ -347,7 +371,7 @@ const IndicatorForm = () => {
     }
     if (camposConfig.ia.mostraValorPorAnalise) novaIA.valorPorAnalise = ''
     if (camposConfig.ia.mostraImpactoEvitado) novaIA.impactoEvitado = ''
-    
+
     setFormData(prev => ({
       ...prev,
       comIA: {
@@ -513,7 +537,7 @@ const IndicatorForm = () => {
           return
         }
         indicatorIdToUse = createResult.indicator.id
-        
+
         if (isEditing && !isValidUUID) {
           console.warn('Indicador com ID inválido foi recriado no Supabase com novo UUID')
         }
@@ -553,21 +577,21 @@ const IndicatorForm = () => {
     <div>
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
-        <button
-          onClick={() => navigate(`/projects/${id}/indicators`)}
+          <button
+            onClick={() => navigate(`/projects/${id}/indicators`)}
             className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-        >
+          >
             <i className="fas fa-arrow-left"></i>
-        </button>
+          </button>
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          {isEditing ? 'Editar Indicador' : 'Novo Indicador'}
-        </h1>
-        {project && (
+              {isEditing ? 'Editar Indicador' : 'Novo Indicador'}
+            </h1>
+            {project && (
               <p className="text-slate-600 dark:text-slate-400 mt-1">
                 Projeto: {project.name || project.nome}
               </p>
-        )}
+            )}
           </div>
         </div>
       </div>
@@ -721,7 +745,7 @@ const IndicatorForm = () => {
                       />
                     ))}
                   </div>
-                  
+
                   {/* Total de Custos */}
                   <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

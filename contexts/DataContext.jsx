@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { projectServiceSupabase } from '../services/projectServiceSupabase'
 import { indicatorServiceSupabase } from '../services/indicatorServiceSupabase'
 import { calcularROIIndicador, calcularROIProjeto } from '../services/roiCalculatorService'
@@ -13,7 +13,21 @@ export const DataProvider = ({ children }) => {
   const [indicators, setIndicators] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Log quando user muda
+  useEffect(() => {
+    console.log('👤 [DataContext] User mudou:', user?.id || 'null')
+  }, [user?.id])
+
+  // Log quando indicadores mudam
+  useEffect(() => {
+    console.log('📊 [DataContext] Estado de indicadores mudou:', indicators.length, 'indicadores')
+    if (indicators.length > 0) {
+      console.log('📊 [DataContext] IDs dos indicadores:', indicators.map(ind => ind.id))
+    }
+  }, [indicators])
+
   const loadData = useCallback(async () => {
+    console.log('🔄 [DataContext] loadData chamado - Stack trace:', new Error().stack?.split('\n')[2]?.trim())
     if (!user?.id) {
       setProjects([])
       setIndicators([])
@@ -21,6 +35,7 @@ export const DataProvider = ({ children }) => {
       return
     }
 
+    console.log('🔄 [DataContext] loadData iniciando carregamento...')
     setLoading(true)
     try {
       // CRÍTICO: Valida sessão antes de carregar dados
@@ -44,7 +59,9 @@ export const DataProvider = ({ children }) => {
       setProjects(projectsData || [])
       
       // Carrega indicadores do Supabase
+      console.log('📊 [DataContext] Carregando indicadores do Supabase...')
       const indicatorsData = await indicatorServiceSupabase.getAll()
+      console.log('📊 [DataContext] Indicadores carregados:', indicatorsData?.length || 0, 'indicadores')
       setIndicators(indicatorsData || [])
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -77,6 +94,7 @@ export const DataProvider = ({ children }) => {
 
   // CRÍTICO: Revalida dados e sessão periodicamente
   useEffect(() => {
+    console.log('🔄 [DataContext] useEffect de revalidação executado - user?.id:', user?.id)
     if (!user?.id) {
       setProjects([])
       setIndicators([])
@@ -85,18 +103,20 @@ export const DataProvider = ({ children }) => {
     }
 
     // Primeira carga
+    console.log('🔄 [DataContext] Primeira carga de dados...')
     loadData()
 
     // Revalida a cada 30 segundos
     const intervalId = setInterval(() => {
-      console.log('🔄 Revalidando dados e sessão do usuário...')
+      console.log('🔄 [DataContext] Revalidação periódica (30s) - executando loadData...')
       loadData()
     }, 30000) // 30 segundos
 
     return () => {
+      console.log('🔄 [DataContext] Limpando intervalo de revalidação')
       clearInterval(intervalId)
     }
-  }, [user, loadData])
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const createProject = async (data) => {
     // Validação adicional: verifica se usuário está autenticado
@@ -141,26 +161,40 @@ export const DataProvider = ({ children }) => {
   }
 
   const createIndicator = async (data) => {
+    console.log('📊 [DataContext] createIndicator chamado')
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
     
     const result = await indicatorServiceSupabase.create(data)
-    if (result.success) {
-      await loadData()
+    if (result.success && result.indicator) {
+      console.log('📊 [DataContext] Indicador criado, atualizando estado localmente:', result.indicator.id)
+      // Atualiza estado localmente em vez de recarregar tudo
+      setIndicators(prev => {
+        const updated = [...prev, result.indicator]
+        console.log('📊 [DataContext] Estado de indicadores atualizado:', updated.length, 'indicadores')
+        return updated
+      })
       return result
     }
     return result
   }
 
   const updateIndicator = async (id, data) => {
+    console.log('📊 [DataContext] updateIndicator chamado para ID:', id)
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
     
     const result = await indicatorServiceSupabase.update(id, data)
-    if (result.success) {
-      await loadData()
+    if (result.success && result.indicator) {
+      console.log('📊 [DataContext] Indicador atualizado, atualizando estado localmente:', id)
+      // Atualiza estado localmente em vez de recarregar tudo
+      setIndicators(prev => {
+        const updated = prev.map(ind => ind.id === id ? result.indicator : ind)
+        console.log('📊 [DataContext] Estado de indicadores atualizado:', updated.length, 'indicadores')
+        return updated
+      })
       return result
     }
     return result
@@ -173,16 +207,17 @@ export const DataProvider = ({ children }) => {
     
     const result = await indicatorServiceSupabase.delete(id)
     if (result.success) {
-      await loadData()
+      // Remove do estado localmente em vez de recarregar tudo
+      setIndicators(prev => prev.filter(ind => ind.id !== id))
       return result
     }
     return result
   }
 
-  const getProjectById = (id) => {
+  const getProjectById = useCallback((id) => {
     // Busca do estado (sempre atualizado após loadData)
     return projects.find(p => p.id === id) || null
-  }
+  }, [projects])
 
   const getIndicatorsByProjectId = async (projectId) => {
     if (!user?.id) {
@@ -198,19 +233,21 @@ export const DataProvider = ({ children }) => {
     }
   }
 
-  const getIndicatorById = async (id) => {
+  const getIndicatorById = useCallback(async (id) => {
+    console.log('📊 [DataContext] getIndicatorById chamado para ID:', id, '- Stack:', new Error().stack?.split('\n')[2]?.trim())
     if (!user?.id) {
       return null
     }
     
     try {
       const completeIndicator = await indicatorServiceSupabase.getCompleteById(id)
+      console.log('📊 [DataContext] Indicador encontrado:', completeIndicator ? 'SIM' : 'NÃO')
       return completeIndicator
     } catch (error) {
       console.error('Erro ao buscar indicador do Supabase:', error)
       return null
     }
-  }
+  }, [user?.id])
 
   const calculateProjectROI = async (projectId) => {
     // Busca indicadores completos para cálculo
@@ -246,7 +283,8 @@ export const DataProvider = ({ children }) => {
     return calcularROIIndicador(indicator)
   }
 
-  const value = {
+  // Memoiza o value para evitar re-renders desnecessários em componentes filhos
+  const value = useMemo(() => ({
     projects,
     indicators,
     loading,
@@ -262,15 +300,17 @@ export const DataProvider = ({ children }) => {
     calculateProjectROI,
     calculateIndicatorROI,
     refreshData: loadData
-  }
+  }), [projects, indicators, loading, createProject, updateProject, deleteProject, createIndicator, updateIndicator, deleteIndicator, getProjectById, getIndicatorsByProjectId, getIndicatorById, calculateProjectROI, calculateIndicatorROI, loadData])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
 
-export const useData = () => {
+function useData() {
   const context = useContext(DataContext)
   if (!context) {
     throw new Error('useData deve ser usado dentro de DataProvider')
   }
   return context
 }
+
+export { useData }
