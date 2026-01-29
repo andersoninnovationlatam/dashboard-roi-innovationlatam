@@ -890,6 +890,54 @@ export const PostIATab = ({
     }
   }
 
+  // Funções para PRODUTIVIDADE - Métricas Manuais
+  const isPessoaManual = (id: string): boolean => {
+    return id.startsWith('manual-')
+  }
+
+  const addNovaPessoaManual = () => {
+    if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
+      const novaPessoa: PostIAProdutividadePerson = {
+        id: `manual-${Date.now()}`,
+        nome: '',
+        cargo: '',
+        valorHora: 0,
+        tempoGasto: 0,
+        frequenciaReal: {
+          quantidade: 0,
+          periodo: 'Mensal'
+        },
+        frequenciaDesejada: {
+          quantidade: 0,
+          periodo: 'Mensal'
+        }
+      }
+      const updatedData: PostIAData = {
+        ...data,
+        pessoas: [...data.pessoas, novaPessoa]
+      }
+      updateData(updatedData)
+    }
+  }
+
+  const removePessoaManual = (pessoaId: string) => {
+    if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
+      // Só permite remover se for pessoa manual
+      if (!isPessoaManual(pessoaId)) {
+        alert('Pessoas do Baseline não podem ser removidas aqui. Desmarque no dropdown acima.')
+        return
+      }
+      const updatedPessoas = data.pessoas.filter(p => p.id !== pessoaId)
+      const custoTotal = calcularCustoTotalPostIA(updatedPessoas)
+      const updatedData: PostIAData = {
+        ...data,
+        pessoas: updatedPessoas,
+        custoTotalPostIA: custoTotal
+      }
+      updateData(updatedData)
+    }
+  }
+
   // Funções para CAPACIDADE ANALÍTICA
   const addCampoQualitativo = () => {
     if (data.tipo === 'CAPACIDADE ANALÍTICA') {
@@ -952,7 +1000,7 @@ export const PostIATab = ({
             <div className="space-y-4 p-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg mb-6">
               <div>
                 <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
-                  Alguém foi envolvido com a IA?
+                  Deseja utilizar pessoas do Baseline?
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -980,7 +1028,8 @@ export const PostIATab = ({
                         const updatedData: PostIAData = {
                           ...data,
                           pessoaEnvolvida: false,
-                          pessoas: [] // Limpa pessoas quando seleciona "Não"
+                          // Remove apenas pessoas do Baseline, mantém as manuais
+                          pessoas: data.pessoas.filter(p => isPessoaManual(p.id))
                         }
                         updateData(updatedData)
                       }}
@@ -1095,136 +1144,221 @@ export const PostIATab = ({
               )}
             </div>
 
-            {/* Lista de pessoas selecionadas (editáveis) */}
-            {data.pessoaEnvolvida && data.pessoas.length === 0 ? (
-              <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-8">
-                Selecione as pessoas do Baseline acima para começar.
-              </p>
-            ) : data.pessoaEnvolvida && data.pessoas.length > 0 ? (
-              <div className="space-y-4">
-                {data.pessoas.map((pessoa, index) => (
-                  <div
-                    key={pessoa.id || index}
-                    className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-medium text-slate-900 dark:text-white">
-                        {pessoa.nome} - {pessoa.cargo}
-                      </h4>
-                    </div>
+            <hr className="my-6 border-slate-200 dark:border-slate-700" />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                          Valor da Hora (R$)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formatNumberValue(pessoa.valorHora)}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                            updatePessoa(index, 'valorHora', val)
-                          }}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                          Tempo Gasto (min) - <span className="text-green-600 dark:text-green-400">Novo valor</span>
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formatNumberValue(pessoa.tempoGasto)}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                            updatePessoa(index, 'tempoGasto', val)
-                          }}
-                          className="w-full px-3 py-2 border border-green-300 dark:border-green-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Frequências (herdadas, mas podem ser alteradas) */}
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
-                          Frequência Real
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Quantidade
-                            </label>
-                            <input
-                              type="number"
-                              value={formatNumberValue(pessoa.frequenciaReal.quantidade)}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                                updatePessoa(index, 'frequenciaReal.quantidade', val)
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Período
-                            </label>
-                            <select
-                              value={pessoa.frequenciaReal.periodo}
-                              onChange={(e) => updatePessoa(index, 'frequenciaReal.periodo', e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            >
-                              <option value="Diário">Diário</option>
-                              <option value="Semanal">Semanal</option>
-                              <option value="Mensal">Mensal</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
-                          Frequência Desejada
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Quantidade
-                            </label>
-                            <input
-                              type="number"
-                              value={formatNumberValue(pessoa.frequenciaDesejada.quantidade)}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
-                                updatePessoa(index, 'frequenciaDesejada.quantidade', val)
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Período
-                            </label>
-                            <select
-                              value={pessoa.frequenciaDesejada.periodo}
-                              onChange={(e) => updatePessoa(index, 'frequenciaDesejada.periodo', e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            >
-                              <option value="Diário">Diário</option>
-                              <option value="Semanal">Semanal</option>
-                              <option value="Mensal">Mensal</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            {/* NOVA SEÇÃO: Adicionar Métricas Manuais (SEMPRE VISÍVEL) */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Métricas Adicionais
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    Adicione pessoas/métricas extras que não estão no Baseline
+                  </p>
+                </div>
+                <button
+                  onClick={addNovaPessoaManual}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Métrica
+                </button>
               </div>
-            ) : null}
+
+              {/* Lista todas as pessoas (Baseline + Manuais) */}
+              {data.pessoas.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">
+                    {data.pessoaEnvolvida 
+                      ? 'Selecione pessoas do Baseline acima ou clique em "Adicionar Métrica"'
+                      : 'Clique em "Adicionar Métrica" para começar'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {data.pessoas.map((pessoa, index) => {
+                    const isManual = isPessoaManual(pessoa.id);
+                    return (
+                      <div
+                        key={pessoa.id || index}
+                        className={`p-4 border rounded-lg ${
+                          isManual 
+                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' 
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-slate-900 dark:text-white">
+                              {pessoa.nome || 'Nova Métrica'} {pessoa.cargo && `- ${pessoa.cargo}`}
+                            </h4>
+                            {isManual && (
+                              <span className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">
+                                Manual
+                              </span>
+                            )}
+                            {!isManual && (
+                              <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded">
+                                Baseline
+                              </span>
+                            )}
+                          </div>
+                          {isManual && (
+                            <button
+                              onClick={() => removePessoaManual(pessoa.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                              title="Remover métrica manual"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {isManual && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                                  Nome
+                                </label>
+                                <input
+                                  type="text"
+                                  value={pessoa.nome}
+                                  onChange={(e) => updatePessoa(index, 'nome', e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                  placeholder="Nome da pessoa"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                                  Cargo
+                                </label>
+                                <input
+                                  type="text"
+                                  value={pessoa.cargo}
+                                  onChange={(e) => updatePessoa(index, 'cargo', e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                  placeholder="Cargo"
+                                />
+                              </div>
+                            </>
+                          )}
+                          <div>
+                            <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                              Valor da Hora (R$)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formatNumberValue(pessoa.valorHora)}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                                updatePessoa(index, 'valorHora', val)
+                              }}
+                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                              Tempo Gasto (min) {!isManual && <span className="text-green-600 dark:text-green-400">- Pós IA</span>}
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formatNumberValue(pessoa.tempoGasto)}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                                updatePessoa(index, 'tempoGasto', val)
+                              }}
+                              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white ${
+                                !isManual ? 'border-green-300 dark:border-green-600' : 'border-slate-300 dark:border-slate-600'
+                              }`}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Frequências */}
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
+                              Frequência Real
+                            </label>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
+                                  Quantidade
+                                </label>
+                                <input
+                                  type="number"
+                                  value={formatNumberValue(pessoa.frequenciaReal.quantidade)}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                                    updatePessoa(index, 'frequenciaReal.quantidade', val)
+                                  }}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
+                                  Período
+                                </label>
+                                <select
+                                  value={pessoa.frequenciaReal.periodo}
+                                  onChange={(e) => updatePessoa(index, 'frequenciaReal.periodo', e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                >
+                                  <option value="Diário">Diário</option>
+                                  <option value="Semanal">Semanal</option>
+                                  <option value="Mensal">Mensal</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                            <label className="block text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
+                              Frequência Desejada
+                            </label>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
+                                  Quantidade
+                                </label>
+                                <input
+                                  type="number"
+                                  value={formatNumberValue(pessoa.frequenciaDesejada.quantidade)}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                                    updatePessoa(index, 'frequenciaDesejada.quantidade', val)
+                                  }}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
+                                  Período
+                                </label>
+                                <select
+                                  value={pessoa.frequenciaDesejada.periodo}
+                                  onChange={(e) => updatePessoa(index, 'frequenciaDesejada.periodo', e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                >
+                                  <option value="Diário">Diário</option>
+                                  <option value="Semanal">Semanal</option>
+                                  <option value="Mensal">Mensal</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Resultados Prévios */}
             {data.pessoas.length > 0 && baselineData && (
