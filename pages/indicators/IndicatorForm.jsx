@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { indicatorServiceSupabase } from '../../services/indicatorServiceSupabase'
-import { indicatorDataService } from '../../services/indicatorDataService'
+import { supabase } from '../../src/lib/supabase'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Card from '../../components/common/Card'
@@ -19,7 +19,7 @@ const IndicatorForm = () => {
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
   const { getProjectById, getIndicatorById } = useData()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   
   const project = getProjectById(id)
   const isEditing = !!indicatorId
@@ -48,6 +48,39 @@ const IndicatorForm = () => {
   const [forceUpdate, setForceUpdate] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
 
+  // Verifica se está carregando autenticação
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Verificando autenticação...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Verifica se usuário está autenticado
+  if (!user?.id) {
+    return (
+      <div className="p-6">
+        <Card>
+          <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+              Acesso Negado
+            </h3>
+            <p className="text-red-700 dark:text-red-300 mb-4">
+              Você precisa estar autenticado para criar ou editar indicadores.
+            </p>
+            <Button onClick={() => navigate('/login')} variant="primary">
+              Fazer Login
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
   useEffect(() => {
     // Carrega dados do Supabase quando está editando
     const loadIndicatorData = async () => {
@@ -56,157 +89,52 @@ const IndicatorForm = () => {
           const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
           
           if (completeIndicator) {
-            // Carrega dados do Supabase
-            const infoData = completeIndicator.nome ? {
-              nome: completeIndicator.nome,
-              tipoIndicador: completeIndicator.tipoIndicador,
-              descricao: completeIndicator.descricao,
-              camposEspecificos: completeIndicator.camposEspecificos
-            } : null
-
-            // Tenta carregar do localStorage como fallback
-            const localStorageInfo = indicatorDataService.getInfo(indicatorId)
-            const localStorageBaseline = indicatorDataService.getBaseline(indicatorId)
-            const localStorageIA = indicatorDataService.getIA(indicatorId)
-            const localStorageCustos = indicatorDataService.getCustos(indicatorId)
-            const localStoragePostIA = indicatorDataService.getPostIA(indicatorId)
-
-            // Usa dados do Supabase se disponíveis, senão usa localStorage
-            const finalInfoData = infoData || localStorageInfo
-            const finalBaselineData = completeIndicator.baselineData || (localStorageBaseline?.baselineData || localStorageBaseline)
-            const finalIAData = completeIndicator.ia || localStorageIA
-            const finalCustosData = completeIndicator.custos || localStorageCustos?.custos || []
-            const finalPostIAData = completeIndicator.postIAData || (localStoragePostIA?.postIAData || null)
-
-            // Normaliza pessoas do baseline para compatibilidade
-            const pessoasBaseline = (finalBaselineData?.pessoas || []).map(pessoa => ({
+            // Normaliza pessoas do baseline
+            const pessoasBaseline = (completeIndicator.baselineData?.pessoas || []).map(pessoa => ({
               ...pessoa,
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
             }))
 
             // Normaliza pessoas da IA
-            const pessoasIA = (finalIAData?.pessoas || []).map(pessoa => ({
+            const pessoasIA = (completeIndicator.ia?.pessoas || []).map(pessoa => ({
               ...pessoa,
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
             }))
 
             setFormData({
-              nome: finalInfoData?.nome || '',
-              tipoIndicador: finalInfoData?.tipoIndicador || 'Produtividade',
-              descricao: finalInfoData?.descricao || '',
-              camposEspecificos: finalInfoData?.camposEspecificos || {},
+              nome: completeIndicator.nome || '',
+              tipoIndicador: completeIndicator.tipoIndicador || 'Produtividade',
+              descricao: completeIndicator.descricao || '',
+              camposEspecificos: completeIndicador.camposEspecificos || {},
               baseline: {
                 pessoas: pessoasBaseline
               },
-              baselineData: finalBaselineData?.tipo ? finalBaselineData : null,
-              postIAData: finalPostIAData?.tipo ? finalPostIAData : null,
+              baselineData: completeIndicator.baselineData?.tipo ? completeIndicator.baselineData : null,
+              postIAData: completeIndicator.postIAData?.tipo ? completeIndicator.postIAData : null,
               comIA: {
-                precisaValidacao: finalIAData?.precisaValidacao || false,
-                pessoaEnvolvida: finalIAData?.pessoaEnvolvida || false,
+                precisaValidacao: completeIndicator.ia?.precisaValidacao || false,
+                pessoaEnvolvida: completeIndicator.ia?.pessoaEnvolvida || false,
                 pessoas: pessoasIA,
-                ias: finalIAData?.ias || []
+                ias: completeIndicator.ia?.ias || []
               },
-              custos: finalCustosData
+              custos: completeIndicator.custos || []
             })
           } else {
-            // Fallback para localStorage se não encontrar no Supabase
-            const infoData = indicatorDataService.getInfo(indicatorId)
-            const baselineData = indicatorDataService.getBaseline(indicatorId)
-            const iaData = indicatorDataService.getIA(indicatorId)
-            const custosData = indicatorDataService.getCustos(indicatorId)
-            const postIADataRaw = indicatorDataService.getPostIA(indicatorId)
-
-            const pessoasBaseline = (baselineData?.pessoas || []).map(pessoa => ({
-              ...pessoa,
-              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
-            }))
-
-            const pessoasIA = (iaData?.pessoas || []).map(pessoa => ({
-              ...pessoa,
-              periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
-            }))
-
-            let baselineDataStructured = null
-            if (baselineData && typeof baselineData === 'object' && 'baselineData' in baselineData) {
-              baselineDataStructured = baselineData.baselineData
-            }
-
-            let postIADataStructured = null
-            if (postIADataRaw && typeof postIADataRaw === 'object' && 'postIAData' in postIADataRaw) {
-              postIADataStructured = postIADataRaw.postIAData
-            }
-
-            setFormData({
-              nome: infoData?.nome || '',
-              tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
-              descricao: infoData?.descricao || '',
-              camposEspecificos: infoData?.camposEspecificos || {},
-              baseline: {
-                pessoas: pessoasBaseline
-              },
-              baselineData: baselineDataStructured,
-              postIAData: postIADataStructured,
-              comIA: {
-                precisaValidacao: iaData?.precisaValidacao || false,
-                pessoaEnvolvida: iaData?.pessoaEnvolvida || false,
-                pessoas: pessoasIA,
-                ias: iaData?.ias || []
-              },
-              custos: custosData?.custos || []
-            })
+            setError('Indicador não encontrado')
           }
         } catch (error) {
           console.error('Erro ao carregar indicador:', error)
-          // Em caso de erro, tenta carregar do localStorage
-          const infoData = indicatorDataService.getInfo(indicatorId)
-          const baselineData = indicatorDataService.getBaseline(indicatorId)
-          const iaData = indicatorDataService.getIA(indicatorId)
-          const custosData = indicatorDataService.getCustos(indicatorId)
-
-          setFormData({
-            nome: infoData?.nome || '',
-            tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
-            descricao: infoData?.descricao || '',
-            camposEspecificos: infoData?.camposEspecificos || {},
-            baseline: {
-              pessoas: baselineData?.pessoas || []
-            },
-            baselineData: baselineData?.baselineData || null,
-            postIAData: null,
-            comIA: {
-              precisaValidacao: iaData?.precisaValidacao || false,
-              pessoaEnvolvida: iaData?.pessoaEnvolvida || false,
-              pessoas: iaData?.pessoas || [],
-              ias: iaData?.ias || []
-            },
-            custos: custosData?.custos || []
-          })
+          setError('Erro ao carregar dados do indicador')
+        } finally {
+          setDataLoaded(true)
         }
-      } else if (!isEditing) {
-        // Se não está editando, reseta o formData
-        setFormData({
-          nome: '',
-          tipoIndicador: 'Produtividade',
-          descricao: '',
-          camposEspecificos: {},
-          baseline: {
-            pessoas: []
-          },
-          baselineData: null,
-          postIAData: null,
-        comIA: {
-          precisaValidacao: false,
-          pessoaEnvolvida: false,
-          pessoas: [],
-          ias: []
-        },
-          custos: []
-        })
+      } else {
+        setDataLoaded(true)
       }
     }
 
     loadIndicatorData()
-  }, [indicatorId, isEditing]) // Só depende de indicatorId e isEditing
+  }, [indicatorId, isEditing])
 
   const handleChange = (section, field, value) => {
     if (section) {
@@ -540,10 +468,26 @@ const IndicatorForm = () => {
       return
     }
 
+    // Verifica autenticação com retry
     if (!user?.id) {
-      setError('Usuário não autenticado')
-      setLoading(false)
-      return
+      try {
+        // Tenta recarregar o usuário
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        
+        if (!currentUser?.id) {
+          setError('Usuário não autenticado. Redirecionando para login...')
+          setLoading(false)
+          setTimeout(() => navigate('/login'), 2000)
+          return
+        }
+        // Se chegou aqui, continua com currentUser (mas precisamos atualizar o contexto)
+      } catch (err) {
+        console.error('Erro ao verificar autenticação:', err)
+        setError('Erro ao verificar autenticação. Por favor, faça login novamente.')
+        setLoading(false)
+        setTimeout(() => navigate('/login'), 2000)
+        return
+      }
     }
 
     try {
