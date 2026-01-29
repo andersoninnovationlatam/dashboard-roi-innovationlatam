@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { authServiceSupabase } from '../services/authServiceSupabase'
+import { supabase } from '../src/lib/supabase'
 
 export const AuthContext = createContext(null)
 
@@ -8,11 +9,20 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let intervalId = null
+    
     // Verifica se há usuário logado no Supabase
     const checkUser = async () => {
       try {
         const currentUser = await authServiceSupabase.getCurrentUser()
-        setUser(currentUser)
+        
+        // Se tinha usuário mas getCurrentUser retornou null = sessão inválida
+        if (!currentUser && user) {
+          console.warn('🔒 Sessão inválida detectada, fazendo logout')
+          setUser(null)
+        } else if (currentUser) {
+          setUser(currentUser)
+        }
       } catch (error) {
         console.error('Erro ao verificar usuário:', error)
         setUser(null)
@@ -21,16 +31,68 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
+    // Primeira verificação
     checkUser()
+
+    // Revalida sessão a cada 5 minutos
+    intervalId = setInterval(() => {
+      if (user) {
+        console.log('🔄 Revalidando sessão do usuário...')
+        checkUser()
+      }
+    }, 5 * 60 * 1000) // 5 minutos
 
     // Escuta mudanças na autenticação
     let subscription = null
     try {
-      const result = authServiceSupabase.onAuthStateChange((user, event) => {
+      const result = authServiceSupabase.onAuthStateChange((newUser, event) => {
         try {
-          setUser(user)
+          console.log('🔐 Auth event:', event)
+          
+          // CORREÇÃO: Ignora INITIAL_SESSION para evitar logs desnecessários
+          if (event === 'INITIAL_SESSION') {
+            // Apenas atualiza o usuário sem log adicional
+            if (newUser) {
+              setUser(newUser)
+            }
+            return
+          }
+          
           if (event === 'SIGNED_OUT') {
+            console.log('🚪 Usuário deslogado')
             setUser(null)
+          } else if (event === 'SIGNED_IN') {
+            console.log('✅ Usuário logado')
+            setUser(newUser)
+          } else if (event === 'TOKEN_REFRESHED') {
+            console.log('🔄 Token renovado')
+            setUser(newUser)
+          } else if (event === 'USER_UPDATED') {
+            console.log('📝 Usuário atualizado')
+            setUser(newUser)
+          } else if (event === 'USER_DELETED') {
+            // CRÍTICO: Usuário foi deletado do Supabase
+            console.error('🗑️ USUÁRIO DELETADO - Fazendo logout imediato e limpando sessão')
+            setUser(null)
+            // Força logout e limpa tudo
+            authServiceSupabase.logout().then(() => {
+              // Force redirect para login
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login'
+              }
+            }).catch(err => {
+              console.error('Erro ao fazer logout após USER_DELETED:', err)
+              // Mesmo com erro, redireciona
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login'
+              }
+            })
+          } else if (!newUser) {
+            // Qualquer evento sem usuário = logout
+            console.warn('🔒 Evento de auth sem usuário, limpando estado')
+            setUser(null)
+          } else {
+            setUser(newUser)
           }
         } catch (err) {
           console.error('Erro no callback de autenticação:', err)
@@ -39,11 +101,13 @@ export const AuthProvider = ({ children }) => {
       subscription = result?.subscription
     } catch (error) {
       console.error('Erro ao configurar listener de autenticação:', error)
-      // Continua mesmo com erro para não quebrar a aplicação
       setLoading(false)
     }
 
     return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
       try {
         if (subscription && typeof subscription.unsubscribe === 'function') {
           subscription.unsubscribe()
@@ -87,6 +151,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null)
     } catch (error) {
       console.error('Erro ao fazer logout:', error)
+      // Mesmo com erro, limpa o estado local por segurança
+      setUser(null)
     }
   }
 

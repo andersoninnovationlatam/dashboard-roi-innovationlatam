@@ -178,17 +178,18 @@ export const indicatorServiceSupabase = {
     }
 
     try {
-      // Obter usuário atual
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        return { success: false, error: 'Usuário não autenticado' }
+      // Obter sessão atual (mais confiável que getUser)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        console.error('Sessão não encontrada ao criar indicador')
+        return { success: false, error: 'Usuário não autenticado. Por favor, faça login novamente.' }
       }
 
       const { data, error } = await supabase
         .from('indicators')
         .insert({
           project_id: indicatorData.projectId || indicatorData.projetoId,
-          user_id: user.id,
+          user_id: session.user.id,
           info_data: indicatorData.info_data || {},
           baseline_data: indicatorData.baseline_data || {},
           ia_data: indicatorData.ia_data || {},
