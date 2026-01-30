@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { authServiceSupabase } from '../services/authServiceSupabase'
+import { userServiceSupabase } from '../services/userServiceSupabase'
 import { supabase } from '../src/lib/supabase'
 
 export const AuthContext = createContext(null)
@@ -7,38 +8,90 @@ export const AuthContext = createContext(null)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const userRef = useRef(user) // Ref para acessar user atual no closure
+  
+  // Atualiza ref quando user muda
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   useEffect(() => {
     let intervalId = null
+    let timeoutId = null
+    let safetyTimeout = null
+    let mounted = true
     
     // Verifica se há usuário logado no Supabase
-    const checkUser = async () => {
+    const checkUser = async (skipIfUserExists = false) => {
+      // OTIMIZAÇÃO: Se já temos usuário e skipIfUserExists = true, não verifica
+      if (skipIfUserExists && userRef.current) {
+        if (mounted) {
+          setLoading(false)
+        }
+        return
+      }
+      
       try {
-        const currentUser = await authServiceSupabase.getCurrentUser()
+        // Timeout aumentado para 15s após login (sessão pode demorar para estar disponível)
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Timeout ao verificar usuário'))
+          }, 15000)
+        })
+
+        const userPromise = authServiceSupabase.getCurrentUser()
         
-        // Se tinha usuário mas getCurrentUser retornou null = sessão inválida
-        if (!currentUser && user) {
-          console.warn('🔒 Sessão inválida detectada, fazendo logout')
-          setUser(null)
-        } else if (currentUser) {
+        const currentUser = await Promise.race([userPromise, timeoutPromise])
+        
+        // Limpa timeout se sucesso
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+        
+        if (mounted && currentUser) {
           setUser(currentUser)
         }
       } catch (error) {
-        console.error('Erro ao verificar usuário:', error)
-        setUser(null)
+        // Não loga timeout esperado como erro crítico
+        if (!error.message?.includes('Timeout')) {
+          console.error('Erro ao verificar usuário:', error)
+        }
+        // Não limpa usuário se já existe (pode ter sido setado pelo login)
+        if (mounted && !userRef.current) {
+          setUser(null)
+        }
       } finally {
-        setLoading(false)
+        // CRÍTICO: Sempre finaliza loading, mesmo em caso de erro
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
-    // Primeira verificação
-    checkUser()
+    // Primeira verificação apenas se não há usuário
+    if (!userRef.current) {
+      checkUser(false) // Verifica normalmente
+    } else {
+      // Se já temos usuário, apenas finaliza loading
+      setLoading(false)
+    }
+    
+    // Timeout de segurança adicional: força loading = false após 20s
+    safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        setLoading(false)
+      }
+    }, 20000)
 
-    // Revalida sessão a cada 5 minutos
+    // Revalida sessão a cada 5 minutos (apenas se há usuário)
     intervalId = setInterval(() => {
-      if (user) {
-        console.log('🔄 Revalidando sessão do usuário...')
-        checkUser()
+      if (mounted) {
+        checkUser(true) // Skip se já há usuário
       }
     }, 5 * 60 * 1000) // 5 minutos
 
@@ -47,6 +100,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = authServiceSupabase.onAuthStateChange((newUser, event) => {
         try {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:100',message:'onAuthStateChange EVENT',data:{event:event,hasNewUser:!!newUser,newUserId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
+          
           console.log('🔐 Auth event:', event)
           
           // CORREÇÃO: Ignora INITIAL_SESSION para evitar logs desnecessários
@@ -62,8 +119,46 @@ export const AuthProvider = ({ children }) => {
             console.log('🚪 Usuário deslogado')
             setUser(null)
           } else if (event === 'SIGNED_IN') {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:120',message:'onAuthStateChange SIGNED_IN - BEFORE setUser',data:{userId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            
             console.log('✅ Usuário logado - setUser chamado')
-            setUser(newUser)
+            
+            // CORREÇÃO: Buscar dados completos do usuário e atualizar
+            if (newUser?.id) {
+              userServiceSupabase.getById(newUser.id)
+                .then(userRecord => {
+                  if (userRecord) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:128',message:'onAuthStateChange SIGNED_IN - getById SUCCESS',data:{userId:newUser.id,organizationId:userRecord?.organization_id,role:userRecord?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                    // #endregion
+                    
+                    // Atualiza usuário com dados completos
+                    setUser({
+                      ...newUser,
+                      organization_id: userRecord.organization_id,
+                      role: userRecord.role
+                    })
+                  } else {
+                    // Se não encontrou, usa dados básicos
+                    setUser(newUser)
+                  }
+                })
+                .catch(error => {
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:140',message:'onAuthStateChange SIGNED_IN - getById ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                  // #endregion
+                  // Usa dados básicos mesmo se getById falhar
+                  setUser(newUser)
+                })
+            } else {
+              setUser(newUser)
+            }
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:148',message:'onAuthStateChange SIGNED_IN - AFTER setUser',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
           } else if (event === 'TOKEN_REFRESHED') {
             // CRÍTICO: Só atualiza se o ID do usuário realmente mudou
             // Evita re-renders desnecessários quando apenas o token é renovado
@@ -112,8 +207,15 @@ export const AuthProvider = ({ children }) => {
     }
 
     return () => {
+      mounted = false
       if (intervalId) {
         clearInterval(intervalId)
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      if (safetyTimeout) {
+        clearTimeout(safetyTimeout)
       }
       try {
         if (subscription && typeof subscription.unsubscribe === 'function') {
@@ -123,17 +225,43 @@ export const AuthProvider = ({ children }) => {
         console.error('Erro ao desinscrever listener:', error)
       }
     }
-  }, [])
+  }, []) // Executa apenas uma vez na montagem - onAuthStateChange cuida das atualizações
 
   const login = async (email, senha) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:187',message:'AuthContext.login() ENTRY',data:{email:email?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     try {
       const result = await authServiceSupabase.login(email, senha)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:190',message:'AuthContext.login() RESULT',data:{success:result?.success,hasUser:!!result?.user,userId:result?.user?.id,error:result?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
       if (result.success) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:191',message:'AuthContext.login() BEFORE setUser',data:{userId:result.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
         setUser(result.user)
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:192',message:'AuthContext.login() AFTER setUser - RETURN SUCCESS',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
         return { success: true }
       }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:194',message:'AuthContext.login() RETURN ERROR',data:{error:result?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
       return result
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:196',message:'AuthContext.login() CATCH ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       return { success: false, error: error.message || 'Erro ao fazer login' }
     }
   }
@@ -163,13 +291,72 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Métodos de verificação de permissões
+  const hasRole = (role) => {
+    if (!user) return false
+    return user.role === role
+  }
+
+  const hasAnyRole = (roles) => {
+    if (!user) return false
+    return Array.isArray(roles) && roles.includes(user.role)
+  }
+
+  const canCreateProject = () => {
+    return hasAnyRole(['admin', 'manager'])
+  }
+
+  const canEditProject = () => {
+    return hasAnyRole(['admin', 'manager'])
+  }
+
+  const canDeleteProject = () => {
+    return hasRole('admin')
+  }
+
+  const canCreateIndicator = () => {
+    return hasAnyRole(['admin', 'manager', 'analyst'])
+  }
+
+  const canEditIndicator = () => {
+    return hasAnyRole(['admin', 'manager', 'analyst'])
+  }
+
+  const canDeleteIndicator = () => {
+    return hasAnyRole(['admin', 'manager'])
+  }
+
+  const canManageUsers = () => {
+    return hasRole('admin')
+  }
+
+  const canManageOrganizations = () => {
+    return hasRole('admin')
+  }
+
+  const canViewDashboard = () => {
+    return !!user // Qualquer usuário autenticado pode ver dashboards
+  }
+
   const value = {
     user,
     loading,
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    // Métodos de permissão
+    hasRole,
+    hasAnyRole,
+    canCreateProject,
+    canEditProject,
+    canDeleteProject,
+    canCreateIndicator,
+    canEditIndicator,
+    canDeleteIndicator,
+    canManageUsers,
+    canManageOrganizations,
+    canViewDashboard
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

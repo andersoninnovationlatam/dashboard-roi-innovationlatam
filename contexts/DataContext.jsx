@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { projectServiceSupabase } from '../services/projectServiceSupabase'
 import { indicatorServiceSupabase } from '../services/indicatorServiceSupabase'
+import { organizationServiceSupabase } from '../services/organizationServiceSupabase'
+import { trackingService } from '../services/trackingService'
+import { calculatedResultsService } from '../services/calculatedResultsService'
 import { calcularROIIndicador, calcularROIProjeto } from '../services/roiCalculatorService'
 import { useAuth } from './AuthContext'
 import { supabase } from '../src/lib/supabase'
@@ -11,23 +14,12 @@ export const DataProvider = ({ children }) => {
   const { user, logout } = useAuth()
   const [projects, setProjects] = useState([])
   const [indicators, setIndicators] = useState([])
+  const [organizations, setOrganizations] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Log quando user muda
-  useEffect(() => {
-    console.log('👤 [DataContext] User mudou:', user?.id || 'null')
-  }, [user?.id])
-
-  // Log quando indicadores mudam
-  useEffect(() => {
-    console.log('📊 [DataContext] Estado de indicadores mudou:', indicators.length, 'indicadores')
-    if (indicators.length > 0) {
-      console.log('📊 [DataContext] IDs dos indicadores:', indicators.map(ind => ind.id))
-    }
-  }, [indicators])
+  // Logs removidos para melhorar performance (manter apenas em desenvolvimento se necessário)
 
   const loadData = useCallback(async () => {
-    console.log('🔄 [DataContext] loadData chamado - Stack trace:', new Error().stack?.split('\n')[2]?.trim())
     if (!user?.id) {
       setProjects([])
       setIndicators([])
@@ -35,7 +27,6 @@ export const DataProvider = ({ children }) => {
       return
     }
 
-    console.log('🔄 [DataContext] loadData iniciando carregamento...')
     setLoading(true)
     try {
       // CRÍTICO: Valida sessão antes de carregar dados
@@ -54,15 +45,21 @@ export const DataProvider = ({ children }) => {
         return
       }
 
-      // Carrega projetos do Supabase
-      const projectsData = await projectServiceSupabase.getAll(user.id)
+      // OTIMIZAÇÃO: Carrega projetos, indicadores e organização em PARALELO
+      const [projectsData, indicatorsData, orgData] = await Promise.all([
+        projectServiceSupabase.getAll(),
+        indicatorServiceSupabase.getAll(),
+        user?.organization_id 
+          ? organizationServiceSupabase.getById(user.organization_id)
+          : Promise.resolve(null)
+      ])
+
       setProjects(projectsData || [])
-      
-      // Carrega indicadores do Supabase
-      console.log('📊 [DataContext] Carregando indicadores do Supabase...')
-      const indicatorsData = await indicatorServiceSupabase.getAll()
-      console.log('📊 [DataContext] Indicadores carregados:', indicatorsData?.length || 0, 'indicadores')
       setIndicators(indicatorsData || [])
+      
+      if (orgData) {
+        setOrganizations([orgData])
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
       
@@ -94,7 +91,6 @@ export const DataProvider = ({ children }) => {
 
   // CRÍTICO: Revalida dados e sessão periodicamente
   useEffect(() => {
-    console.log('🔄 [DataContext] useEffect de revalidação executado - user?.id:', user?.id)
     if (!user?.id) {
       setProjects([])
       setIndicators([])
@@ -103,20 +99,20 @@ export const DataProvider = ({ children }) => {
     }
 
     // Primeira carga
-    console.log('🔄 [DataContext] Primeira carga de dados...')
     loadData()
 
-    // Revalida a cada 30 segundos
+    // OTIMIZAÇÃO: Revalida a cada 60 segundos (reduzido de 30s para melhor performance)
+    // E apenas se a aba do navegador estiver ativa
     const intervalId = setInterval(() => {
-      console.log('🔄 [DataContext] Revalidação periódica (30s) - executando loadData...')
-      loadData()
-    }, 30000) // 30 segundos
+      if (document.visibilityState === 'visible') {
+        loadData()
+      }
+    }, 60000) // 60 segundos
 
     return () => {
-      console.log('🔄 [DataContext] Limpando intervalo de revalidação')
       clearInterval(intervalId)
     }
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, loadData])
 
   const createProject = async (data) => {
     // Validação adicional: verifica se usuário está autenticado
@@ -147,7 +143,7 @@ export const DataProvider = ({ children }) => {
 
   const deleteProject = async (id) => {
     if (!user?.id) return { success: false, error: 'Usuário não autenticado' }
-    const result = await projectServiceSupabase.delete(id, user.id)
+    const result = await projectServiceSupabase.delete(id)
     if (result.success) {
       // Remove indicadores do projeto
       const projectIndicators = await indicatorServiceSupabase.getByProjectId(id)
@@ -252,9 +248,10 @@ export const DataProvider = ({ children }) => {
   const calculateProjectROI = async (projectId) => {
     // Busca indicadores completos para cálculo
     try {
+      const project = getProjectById(projectId)
       const projectIndicators = await getIndicatorsByProjectId(projectId)
       if (!Array.isArray(projectIndicators) || projectIndicators.length === 0) {
-        return calcularROIProjeto(projectId, [])
+        return calcularROIProjeto(projectId, [], project)
       }
 
       // Valida UUID antes de buscar indicadores completos
@@ -272,10 +269,11 @@ export const DataProvider = ({ children }) => {
           }
         })
       )
-      return calcularROIProjeto(projectId, completeIndicators.filter(Boolean))
+      return calcularROIProjeto(projectId, completeIndicators.filter(Boolean), project)
     } catch (error) {
       console.error('Erro ao calcular ROI do projeto:', error)
-      return calcularROIProjeto(projectId, [])
+      const project = getProjectById(projectId)
+      return calcularROIProjeto(projectId, [], project)
     }
   }
 
@@ -283,10 +281,82 @@ export const DataProvider = ({ children }) => {
     return calcularROIIndicador(indicator)
   }
 
+  // Métodos para organizações
+  const getOrganizationById = useCallback(async (id) => {
+    return await organizationServiceSupabase.getById(id)
+  }, [])
+
+  const getCurrentOrganization = useCallback(() => {
+    if (!user?.organization_id) return null
+    return organizations.find(org => org.id === user.organization_id) || null
+  }, [organizations, user?.organization_id])
+
+  // Métodos para tracking
+  const getTrackingByIndicatorId = useCallback(async (indicatorId) => {
+    return await trackingService.getByIndicatorId(indicatorId)
+  }, [])
+
+  const createTracking = useCallback(async (trackingData) => {
+    const result = await trackingService.create(trackingData)
+    if (result.success) {
+      await loadData()
+    }
+    return result
+  }, [loadData])
+
+  const updateTracking = useCallback(async (id, trackingData) => {
+    const result = await trackingService.update(id, trackingData)
+    if (result.success) {
+      await loadData()
+    }
+    return result
+  }, [loadData])
+
+  // Métodos para calculated_results
+  const getCalculatedResultByIndicatorId = useCallback(async (indicatorId) => {
+    return await calculatedResultsService.getLatestByIndicatorId(indicatorId)
+  }, [])
+
+  const upsertCalculatedResult = useCallback(async (resultData) => {
+    return await calculatedResultsService.upsert(resultData)
+  }, [])
+
   // Memoiza o value para evitar re-renders desnecessários em componentes filhos
   const value = useMemo(() => ({
     projects,
     indicators,
+    organizations,
+    loading,
+    // Projetos
+    createProject,
+    updateProject,
+    deleteProject,
+    getProjectById,
+    // Indicadores
+    createIndicator,
+    updateIndicator,
+    deleteIndicator,
+    getIndicatorsByProjectId,
+    getIndicatorById,
+    // Cálculos
+    calculateProjectROI,
+    calculateIndicatorROI,
+    // Organizações
+    getOrganizationById,
+    getCurrentOrganization,
+    // Tracking
+    getTrackingByIndicatorId,
+    createTracking,
+    updateTracking,
+    // Calculated Results
+    getCalculatedResultByIndicatorId,
+    upsertCalculatedResult,
+    // Utilitários
+    refreshData: loadData
+  }), [
+    projects,
+    indicators,
+    organizations,
     loading,
     createProject,
     updateProject,
@@ -299,8 +369,15 @@ export const DataProvider = ({ children }) => {
     getIndicatorById,
     calculateProjectROI,
     calculateIndicatorROI,
-    refreshData: loadData
-  }), [projects, indicators, loading, createProject, updateProject, deleteProject, createIndicator, updateIndicator, deleteIndicator, getProjectById, getIndicatorsByProjectId, getIndicatorById, calculateProjectROI, calculateIndicatorROI, loadData])
+    getOrganizationById,
+    getCurrentOrganization,
+    getTrackingByIndicatorId,
+    createTracking,
+    updateTracking,
+    getCalculatedResultByIndicatorId,
+    upsertCalculatedResult,
+    loadData
+  ])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
