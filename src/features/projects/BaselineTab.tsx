@@ -827,14 +827,14 @@ export const BaselineTab = ({
                         </div>
                         <div>
                           <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                            Valor
+                            Descrição/Valor
                           </label>
-                          <input
-                            type="text"
+                          <textarea
                             value={campo.valor}
                             onChange={(e) => updateCampoQualitativo(index, 'valor', e.target.value)}
+                            rows={3}
                             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                            placeholder="Valor qualitativo"
+                            placeholder="Descreva o insight ou valor qualitativo gerado..."
                           />
                         </div>
                       </div>

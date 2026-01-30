@@ -1,6 +1,7 @@
 /**
  * Serviço de Resultados Calculados com Supabase
- * Gerencia CRUD de calculated_results usando Supabase
+ * Gerencia CRUD de indicator_calculated_metrics usando Supabase
+ * NOTA: Esta tabela foi renomeada de calculated_results para indicator_calculated_metrics
  */
 
 import { supabase, isSupabaseConfigured } from '../src/lib/supabase'
@@ -17,7 +18,7 @@ export const calculatedResultsService = {
     try {
       // CORREÇÃO: Remover .single() e verificar se há dados antes de retornar
       const { data, error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .select('*')
         .eq('indicator_id', indicatorId)
         .order('calculation_date', { ascending: false })
@@ -51,7 +52,7 @@ export const calculatedResultsService = {
 
     try {
       const { data, error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .select('*')
         .eq('indicator_id', indicatorId)
         .order('calculation_date', { ascending: false })
@@ -78,7 +79,7 @@ export const calculatedResultsService = {
 
     try {
       const { data, error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .select('*')
         .eq('id', id)
         .single()
@@ -104,30 +105,39 @@ export const calculatedResultsService = {
     }
 
     try {
-      // Verificar se já existe resultado para esta data e indicador
-      const existing = await supabase
-        .from('calculated_results')
+      // Verificar se já existe resultado para este indicador (tabela tem UNIQUE(indicator_id))
+      const { data: existingData, error: existingError } = await supabase
+        .from('indicator_calculated_metrics')
         .select('id')
         .eq('indicator_id', resultData.indicator_id)
-        .eq('calculation_date', resultData.calculation_date)
-        .eq('period_type', resultData.period_type)
-        .single()
+        .maybeSingle()
 
-      if (existing.data) {
+      if (existingError && existingError.code !== 'PGRST116') {
+        console.error('Erro ao verificar resultado existente:', existingError)
+        return { success: false, error: existingError.message }
+      }
+
+      // Mapear campos antigos para novos campos da tabela
+      const updateData = {
+        // Campos gerais
+        roi_percentage: resultData.roi_percentage || 0,
+        payback_months: resultData.payback_months || null,
+        custo_implementacao: resultData.cost_post_ia || 0,
+        // Mapear campos antigos para novos (se disponíveis)
+        horas_economizadas_mes: resultData.hours_saved || 0,
+        custo_total_baseline: resultData.cost_baseline || 0,
+        custo_total_post_ia: resultData.cost_post_ia || 0,
+        // Campos que podem ser mapeados
+        economia_mensal: resultData.net_savings || resultData.gross_savings || 0,
+        updated_at: new Date().toISOString()
+      }
+
+      if (existingData) {
         // Atualizar existente
         const { data, error } = await supabase
-          .from('calculated_results')
-          .update({
-            hours_saved: resultData.hours_saved,
-            money_saved: resultData.money_saved,
-            cost_baseline: resultData.cost_baseline,
-            cost_post_ia: resultData.cost_post_ia,
-            gross_savings: resultData.gross_savings,
-            net_savings: resultData.net_savings,
-            roi_percentage: resultData.roi_percentage,
-            payback_months: resultData.payback_months
-          })
-          .eq('id', existing.data.id)
+          .from('indicator_calculated_metrics')
+          .update(updateData)
+          .eq('id', existingData.id)
           .select()
           .single()
 
@@ -140,19 +150,11 @@ export const calculatedResultsService = {
       } else {
         // Criar novo
         const { data, error } = await supabase
-          .from('calculated_results')
+          .from('indicator_calculated_metrics')
           .insert({
             indicator_id: resultData.indicator_id,
-            calculation_date: resultData.calculation_date || new Date().toISOString().split('T')[0],
-            period_type: resultData.period_type || 'monthly',
-            hours_saved: resultData.hours_saved || 0,
-            money_saved: resultData.money_saved || 0,
-            cost_baseline: resultData.cost_baseline || 0,
-            cost_post_ia: resultData.cost_post_ia || 0,
-            gross_savings: resultData.gross_savings || 0,
-            net_savings: resultData.net_savings || 0,
-            roi_percentage: resultData.roi_percentage || 0,
-            payback_months: resultData.payback_months || null
+            calculation_date: resultData.calculation_date || new Date().toISOString(),
+            ...updateData
           })
           .select()
           .single()
@@ -181,18 +183,25 @@ export const calculatedResultsService = {
     try {
       const updateData = {}
       
-      if (resultData.hours_saved !== undefined) updateData.hours_saved = resultData.hours_saved
-      if (resultData.money_saved !== undefined) updateData.money_saved = resultData.money_saved
-      if (resultData.cost_baseline !== undefined) updateData.cost_baseline = resultData.cost_baseline
-      if (resultData.cost_post_ia !== undefined) updateData.cost_post_ia = resultData.cost_post_ia
-      if (resultData.gross_savings !== undefined) updateData.gross_savings = resultData.gross_savings
-      if (resultData.net_savings !== undefined) updateData.net_savings = resultData.net_savings
+      // Mapear campos antigos para novos campos da tabela indicator_calculated_metrics
+      if (resultData.hours_saved !== undefined) updateData.horas_economizadas_mes = resultData.hours_saved
+      if (resultData.money_saved !== undefined) updateData.economia_mensal = resultData.money_saved
+      if (resultData.cost_baseline !== undefined) updateData.custo_total_baseline = resultData.cost_baseline
+      if (resultData.cost_post_ia !== undefined) {
+        updateData.custo_total_post_ia = resultData.cost_post_ia
+        updateData.custo_implementacao = resultData.cost_post_ia
+      }
+      if (resultData.gross_savings !== undefined) updateData.economia_mensal = resultData.gross_savings
+      if (resultData.net_savings !== undefined) updateData.economia_mensal = resultData.net_savings
       if (resultData.roi_percentage !== undefined) updateData.roi_percentage = resultData.roi_percentage
       if (resultData.payback_months !== undefined) updateData.payback_months = resultData.payback_months
+      
+      // Adicionar updated_at
+      updateData.updated_at = new Date().toISOString()
 
       // CORREÇÃO: Remover .single() pois pode retornar 0 linhas se RLS bloquear
       const { data, error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .update(updateData)
         .eq('id', id)
         .select()
@@ -208,7 +217,7 @@ export const calculatedResultsService = {
 
       // Verificar se retornou dados (pode ser vazio se RLS bloqueou)
       if (!data || data.length === 0) {
-        console.warn(`Update não retornou dados para calculated_result ${id} - possível bloqueio de RLS`)
+        console.warn(`Update não retornou dados para indicator_calculated_metrics ${id} - possível bloqueio de RLS`)
         return { success: false, error: 'Não foi possível atualizar o resultado calculado. Verifique as permissões.' }
       }
 
@@ -229,7 +238,7 @@ export const calculatedResultsService = {
 
     try {
       const { error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .delete()
         .eq('id', id)
 
@@ -255,7 +264,7 @@ export const calculatedResultsService = {
 
     try {
       const { error } = await supabase
-        .from('calculated_results')
+        .from('indicator_calculated_metrics')
         .delete()
         .eq('indicator_id', indicatorId)
 

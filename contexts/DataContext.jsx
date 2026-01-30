@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { projectServiceSupabase } from '../services/projectServiceSupabase'
 import { indicatorServiceSupabase } from '../services/indicatorServiceSupabase'
 import { organizationServiceSupabase } from '../services/organizationServiceSupabase'
@@ -16,6 +16,7 @@ export const DataProvider = ({ children }) => {
   const [indicators, setIndicators] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [loading, setLoading] = useState(true)
+  const loadDataRef = useRef(null)
 
   // Logs removidos para melhorar performance (manter apenas em desenvolvimento se necessário)
 
@@ -88,6 +89,13 @@ export const DataProvider = ({ children }) => {
       setLoading(false)
     }
   }, [user?.id, user?.organization_id, logout])
+  
+  // Rastreia quando loadData é recriado
+  useEffect(() => {
+    if (loadDataRef.current !== loadData) {
+      loadDataRef.current = loadData
+    }
+  }, [loadData, user?.id, user?.organization_id])
 
   // Carrega dados inicialmente e configura subscriptions real-time
   useEffect(() => {
@@ -196,7 +204,7 @@ export const DataProvider = ({ children }) => {
     return projects.find(p => p.id === id) || null
   }, [projects])
 
-  const getIndicatorsByProjectId = async (projectId) => {
+  const getIndicatorsByProjectId = useCallback(async (projectId) => {
     if (!user?.id) {
       return []
     }
@@ -208,7 +216,7 @@ export const DataProvider = ({ children }) => {
       console.error('Erro ao buscar indicadores do Supabase:', error)
       return []
     }
-  }
+  }, [user?.id])
 
   const getIndicatorById = useCallback(async (id) => {
     if (!user?.id) {
@@ -224,7 +232,7 @@ export const DataProvider = ({ children }) => {
     }
   }, [user?.id])
 
-  const calculateProjectROI = async (projectId) => {
+  const calculateProjectROI = useCallback(async (projectId) => {
     // Busca indicadores completos para cálculo
     try {
       const project = getProjectById(projectId)
@@ -254,7 +262,7 @@ export const DataProvider = ({ children }) => {
       const project = getProjectById(projectId)
       return calcularROIProjeto(projectId, [], project)
     }
-  }
+  }, [getProjectById, getIndicatorsByProjectId, getIndicatorById])
 
   const calculateIndicatorROI = (indicator) => {
     return calcularROIIndicador(indicator)

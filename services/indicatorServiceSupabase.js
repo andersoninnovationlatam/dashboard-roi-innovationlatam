@@ -10,6 +10,7 @@ import { customMetricService } from './customMetricService'
 import { calculatedResultsService } from './calculatedResultsService'
 import { trackingService } from './trackingService'
 import { auditLogService } from './auditLogService'
+import { indicatorCalculatedMetricsService } from './indicatorCalculatedMetricsService'
 
 // Função para validar se um ID é um UUID válido
 const isValidUUID = (id) => {
@@ -215,7 +216,7 @@ export const indicatorServiceSupabase = {
       if (!indicator) return null
 
       // Buscar dados relacionados em paralelo
-      const [personsBaseline, personsPostIA, toolsBaseline, toolsPostIA, customMetrics, calculatedResult, trackingHistory, typeSpecificData] = await Promise.all([
+      const [personsBaseline, personsPostIA, toolsBaseline, toolsPostIA, customMetrics, calculatedResult, trackingHistory, calculatedMetrics] = await Promise.all([
         personInvolvedService.getByIndicatorId(id, 'baseline'),
         personInvolvedService.getByIndicatorId(id, 'post_ia'),
         toolCostService.getByIndicatorId(id, 'baseline'),
@@ -223,17 +224,11 @@ export const indicatorServiceSupabase = {
         customMetricService.getByIndicatorId(id),
         calculatedResultsService.getLatestByIndicatorId(id),
         trackingService.getByIndicatorId(id),
-        supabase.from('indicator_type_specific_data').select('*').eq('indicator_id', id).maybeSingle().then(({ data, error }) => {
-          // maybeSingle() retorna null quando não há registro (ao invés de erro)
-          // Trata erros 406 (Not Acceptable) que podem ocorrer com RLS
-          if (error && error.code !== 'PGRST116' && error.code !== 'PGRST301') {
-            // PGRST116 = nenhum registro encontrado (ok com maybeSingle)
-            // PGRST301 = múltiplos registros (não deveria acontecer, mas trata)
-            console.error('Erro ao buscar dados específicos:', error)
-          }
-          return data || null
-        })
+        indicatorCalculatedMetricsService.getByIndicatorId(id)
       ])
+
+      // Buscar dados específicos do tipo baseado no improvement_type
+      const typeSpecificData = await this._getTypeSpecificData(id, indicator.improvement_type)
 
       // Mapear improvement_type para tipo do BaselineTab
       const improvementTypeToBaselineType = {
@@ -254,6 +249,17 @@ export const indicatorServiceSupabase = {
       const pessoasPostIATransformed = this._transformPersonsToLegacy(personsPostIA, 'post_ia')
 
       // Adicionar frequenciaReal e frequenciaDesejada das colunas normalizadas
+      // Para produtividade, usar dados de indicator_produtividade_data se disponível
+      const baselineFreqReal = (baselineType === 'PRODUTIVIDADE' && typeSpecificData?.baseline_frequency_real !== undefined) 
+        ? typeSpecificData.baseline_frequency_real 
+        : indicator.baseline_frequency_real
+      const baselineFreqDesired = (baselineType === 'PRODUTIVIDADE' && typeSpecificData?.baseline_frequency_desired !== undefined) 
+        ? typeSpecificData.baseline_frequency_desired 
+        : indicator.baseline_frequency_desired
+      const freqUnit = (baselineType === 'PRODUTIVIDADE' && typeSpecificData?.frequency_unit) 
+        ? typeSpecificData.frequency_unit 
+        : indicator.frequency_unit
+
       const pessoasBaselineComFrequencia = pessoasBaselineTransformed.map((pessoa, index) => {
         const personData = personsBaseline[index]
         const periodoMap = {
@@ -265,15 +271,20 @@ export const indicatorServiceSupabase = {
           ...pessoa,
           id: pessoa.id || personData?.id || `pessoa-${Date.now()}-${Math.random()}`,
           frequenciaReal: {
-            quantidade: personData?.frequency_real_quantity || indicator.baseline_frequency_real || 0,
-            periodo: periodoMap[personData?.frequency_real_unit] || (indicator.frequency_unit === 'day' ? 'Diário' : indicator.frequency_unit === 'week' ? 'Semanal' : 'Mensal')
+            quantidade: personData?.frequency_real_quantity || baselineFreqReal || 0,
+            periodo: periodoMap[personData?.frequency_real_unit] || (freqUnit === 'day' ? 'Diário' : freqUnit === 'week' ? 'Semanal' : 'Mensal')
           },
           frequenciaDesejada: {
-            quantidade: personData?.frequency_desired_quantity || indicator.baseline_frequency_desired || indicator.baseline_frequency_real || 0,
-            periodo: periodoMap[personData?.frequency_desired_unit] || (indicator.frequency_unit === 'day' ? 'Diário' : indicator.frequency_unit === 'week' ? 'Semanal' : 'Mensal')
+            quantidade: personData?.frequency_desired_quantity || baselineFreqDesired || baselineFreqReal || 0,
+            periodo: periodoMap[personData?.frequency_desired_unit] || (freqUnit === 'day' ? 'Diário' : freqUnit === 'week' ? 'Semanal' : 'Mensal')
           }
         }
       })
+
+      // Para produtividade, usar dados de indicator_produtividade_data se disponível
+      const postIAFreq = (baselineType === 'PRODUTIVIDADE' && typeSpecificData?.post_ia_frequency !== undefined) 
+        ? typeSpecificData.post_ia_frequency 
+        : indicator.post_ia_frequency
 
       const pessoasPostIAComFrequencia = pessoasPostIATransformed.map((pessoa, index) => {
         const personData = personsPostIA[index]
@@ -286,12 +297,12 @@ export const indicatorServiceSupabase = {
           ...pessoa,
           id: pessoa.id || personData?.id || `pessoa-${Date.now()}-${Math.random()}`,
           frequenciaReal: {
-            quantidade: personData?.frequency_real_quantity || indicator.post_ia_frequency || 0,
-            periodo: periodoMap[personData?.frequency_real_unit] || (indicator.frequency_unit === 'day' ? 'Diário' : indicator.frequency_unit === 'week' ? 'Semanal' : 'Mensal')
+            quantidade: personData?.frequency_real_quantity || postIAFreq || 0,
+            periodo: periodoMap[personData?.frequency_real_unit] || (freqUnit === 'day' ? 'Diário' : freqUnit === 'week' ? 'Semanal' : 'Mensal')
           },
           frequenciaDesejada: {
-            quantidade: personData?.frequency_real_quantity || indicator.post_ia_frequency || 0,
-            periodo: periodoMap[personData?.frequency_real_unit] || (indicator.frequency_unit === 'day' ? 'Diário' : indicator.frequency_unit === 'week' ? 'Semanal' : 'Mensal')
+            quantidade: personData?.frequency_real_quantity || postIAFreq || 0,
+            periodo: periodoMap[personData?.frequency_real_unit] || (freqUnit === 'day' ? 'Diário' : freqUnit === 'week' ? 'Semanal' : 'Mensal')
           }
         }
       })
@@ -369,8 +380,8 @@ export const indicatorServiceSupabase = {
             numeroEntregasPeriodo: typeSpecificData?.deliveries_per_period || 0,
             periodoEntregas: typeSpecificData?.deliveries_period || 'mês',
             custoPorAtraso: typeSpecificData?.cost_per_delay || 0,
-            pessoasEnvolvidas: pessoasBaselineComFrequencia.length || 0,
-            valorHoraMedio: 0, // Será calculado a partir das pessoas
+            pessoasEnvolvidas: typeSpecificData?.pessoas_envolvidas || pessoasBaselineComFrequencia.length || 0,
+            valorHoraMedio: typeSpecificData?.valor_hora_medio || 0,
             tempoTrabalhoPorEntrega: typeSpecificData?.work_time_per_delivery_hours || 0
           }
           break
@@ -412,10 +423,10 @@ export const indicatorServiceSupabase = {
         case 'PRODUTIVIDADE':
           postIAData = {
             ...postIAData,
-            pessoaEnvolvida: false,
+            pessoaEnvolvida: typeSpecificData?.pessoa_envolvida || false,
             pessoas: pessoasPostIAComFrequencia,
-            custoTotalPostIA: 0, // Será calculado pelo componente
-            deltaProdutividade: 0 // Será calculado pelo componente
+            custoTotalPostIA: parseFloat(typeSpecificData?.custo_total_post_ia) || parseFloat(calculatedMetrics?.custo_total_post_ia) || 0,
+            deltaProdutividade: parseFloat(typeSpecificData?.delta_produtividade) || parseFloat(calculatedMetrics?.delta_produtividade) || 0
           }
           break
         case 'INCREMENTO RECEITA':
@@ -427,19 +438,25 @@ export const indicatorServiceSupabase = {
         case 'MELHORIA MARGEM':
           postIAData = {
             ...postIAData,
-            margemBrutaEstimada: typeSpecificData?.estimated_margin_percentage || 0
+            receitaBrutaMensalEstimada: typeSpecificData?.receita_bruta_mensal_estimada || 0,
+            custoTotalMensalEstimado: typeSpecificData?.custo_total_mensal_estimado || 0,
+            margemBrutaEstimada: typeSpecificData?.estimated_margin_percentage || 0,
+            volumeTransacoesEstimado: typeSpecificData?.volume_transacoes_estimado || 0
           }
           break
         case 'REDUÇÃO DE RISCO':
           postIAData = {
             ...postIAData,
             probabilidadeComIA: typeSpecificData?.probability_with_ia_percentage || 0,
+            impactoFinanceiroReduzido: typeSpecificData?.impacto_financeiro_reduzido || 0,
             custoMitigacaoComIA: typeSpecificData?.mitigation_cost_with_ia || 0
           }
           break
         case 'QUALIDADE DECISÃO':
           postIAData = {
             ...postIAData,
+            numeroDecisoesPeriodoComIA: typeSpecificData?.numero_decisoes_periodo_com_ia || 0,
+            periodoComIA: typeSpecificData?.periodo_com_ia || 'mês',
             taxaAcertoComIA: typeSpecificData?.accuracy_with_ia_percentage || 0,
             custoMedioDecisaoErradaComIA: typeSpecificData?.avg_cost_wrong_decision_with_ia || 0,
             tempoMedioDecisaoComIA: typeSpecificData?.avg_decision_time_with_ia_minutes || 0,
@@ -449,9 +466,12 @@ export const indicatorServiceSupabase = {
         case 'VELOCIDADE':
           postIAData = {
             ...postIAData,
-            tempoMedioEntregaComIA: typeSpecificData?.delivery_time_with_ia || 0,
-            unidadeTempoEntregaComIA: typeSpecificData?.delivery_time_unit || 'dias',
+            tempoMedioEntregaComIA: typeSpecificData?.delivery_time_with_ia || typeSpecificData?.tempo_medio_entrega_com_ia || 0,
+            unidadeTempoEntregaComIA: typeSpecificData?.unidade_tempo_entrega_com_ia || typeSpecificData?.delivery_time_unit || 'dias',
+            numeroEntregasPeriodoComIA: typeSpecificData?.numero_entregas_periodo_com_ia || 0,
+            periodoEntregasComIA: typeSpecificData?.periodo_entregas_com_ia || 'mês',
             custoPorAtrasoReduzido: typeSpecificData?.cost_per_delay_reduced || 0,
+            pessoasEnvolvidasComIA: typeSpecificData?.pessoas_envolvidas_com_ia || 0,
             tempoTrabalhoPorEntregaComIA: typeSpecificData?.work_time_per_delivery_with_ia_hours || 0
           }
           break
@@ -459,7 +479,11 @@ export const indicatorServiceSupabase = {
           postIAData = {
             ...postIAData,
             scoreComIA: typeSpecificData?.score_with_ia || 0,
-            taxaChurnComIA: typeSpecificData?.churn_rate_with_ia_percentage || 0
+            tipoScore: typeSpecificData?.score_type || 'NPS',
+            numeroClientesEsperado: typeSpecificData?.numero_clientes_esperado || 0,
+            valorMedioPorClienteComIA: typeSpecificData?.valor_medio_por_cliente_com_ia || 0,
+            taxaChurnComIA: typeSpecificData?.churn_rate_with_ia_percentage || 0,
+            ticketMedioSuporteComIA: typeSpecificData?.ticket_medio_suporte_com_ia || 0
           }
           break
         case 'CAPACIDADE ANALÍTICA':
@@ -488,9 +512,9 @@ export const indicatorServiceSupabase = {
         'satisfaction': 'Satisfação',
         'margin_improvement': 'Melhoria Margem'
       }
-      
+
       const tipoIndicadorLegado = improvementTypeToLegacyType[indicator.improvement_type] || 'Produtividade'
-      
+
       const infoDataLegado = {
         nome: indicator.name || '',
         tipoIndicador: tipoIndicadorLegado,
@@ -541,7 +565,7 @@ export const indicatorServiceSupabase = {
       // ============================================================================
       // TRANSFORMAÇÃO DE FORMATO ANTIGO (JSONB) PARA FORMATO NORMALIZADO
       // ============================================================================
-      
+
       // Transformar info_data para campos normalizados
       let name = indicatorData.name
       let description = indicatorData.description
@@ -551,7 +575,7 @@ export const indicatorServiceSupabase = {
         const infoData = indicatorData.info_data
         if (infoData.nome) name = infoData.nome
         if (infoData.descricao) description = infoData.descricao
-        
+
         // Mapear tipoIndicador para improvement_type
         if (infoData.tipoIndicador) {
           const tipoMap = {
@@ -586,7 +610,7 @@ export const indicatorServiceSupabase = {
       }
 
       // REMOVIDO: Não criar mais custom_metrics para tipos que têm colunas específicas
-      // Esses dados agora são salvos diretamente em indicator_type_specific_data
+      // Esses dados agora são salvos diretamente nas tabelas individuais por tipo (indicator_produtividade_data, etc.)
       // custom_metrics deve ser usado apenas para métricas realmente customizadas que não têm coluna específica
 
       // Transformar ia_data.ias[] + custos_data.custos[] → tools_post_ia[]
@@ -614,7 +638,7 @@ export const indicatorServiceSupabase = {
       // Extrair frequências do baseline_data.pessoas[]
       if (indicatorData.baseline_data && indicatorData.baseline_data.pessoas && Array.isArray(indicatorData.baseline_data.pessoas) && indicatorData.baseline_data.pessoas.length > 0) {
         const primeiraPessoa = indicatorData.baseline_data.pessoas[0]
-        
+
         if (primeiraPessoa.frequenciaReal && primeiraPessoa.frequenciaReal.quantidade !== undefined) {
           if (!baselineFrequencyReal) {
             baselineFrequencyReal = parseInt(primeiraPessoa.frequenciaReal.quantidade) || 0
@@ -629,7 +653,7 @@ export const indicatorServiceSupabase = {
             frequencyUnit = periodoMap[primeiraPessoa.frequenciaReal.periodo] || 'month'
           }
         }
-        
+
         if (primeiraPessoa.frequenciaDesejada && primeiraPessoa.frequenciaDesejada.quantidade !== undefined) {
           if (!baselineFrequencyDesired) {
             baselineFrequencyDesired = parseInt(primeiraPessoa.frequenciaDesejada.quantidade) || null
@@ -689,7 +713,7 @@ export const indicatorServiceSupabase = {
           let freqRealUnit = p.frequency_real_unit
           let freqDesiredQty = p.frequency_desired_quantity
           let freqDesiredUnit = p.frequency_desired_unit
-          
+
           if (indicatorData.baseline_data && indicatorData.baseline_data.pessoas && indicatorData.baseline_data.pessoas[index]) {
             const pessoa = indicatorData.baseline_data.pessoas[index]
             if (pessoa.frequenciaReal) {
@@ -711,7 +735,7 @@ export const indicatorServiceSupabase = {
               freqDesiredUnit = periodoMap[pessoa.frequenciaDesejada.periodo] || freqDesiredUnit || 'month'
             }
           }
-          
+
           return {
             indicator_id: indicatorId,
             scenario: 'baseline',
@@ -735,7 +759,7 @@ export const indicatorServiceSupabase = {
           // Extrair frequências do post_ia_data se disponível
           let freqRealQty = p.frequency_real_quantity
           let freqRealUnit = p.frequency_real_unit
-          
+
           if (indicatorData.post_ia_data && indicatorData.post_ia_data.pessoas && indicatorData.post_ia_data.pessoas[index]) {
             const pessoa = indicatorData.post_ia_data.pessoas[index]
             if (pessoa.frequenciaReal) {
@@ -748,7 +772,7 @@ export const indicatorServiceSupabase = {
               freqRealUnit = periodoMap[pessoa.frequenciaReal.periodo] || freqRealUnit || 'month'
             }
           }
-          
+
           return {
             indicator_id: indicatorId,
             scenario: 'post_ia',
@@ -853,18 +877,18 @@ export const indicatorServiceSupabase = {
     return pessoas.map(pessoa => {
       // Mapear nome (pode ser nome ou person_name)
       const personName = pessoa.nome || pessoa.person_name || ''
-      
+
       // Mapear cargo/role (pode ser cargo, funcao ou role)
       const role = pessoa.cargo || pessoa.funcao || pessoa.role || ''
-      
+
       // Mapear valorHora (pode ser valorHora, valorPorAnalise ou hourly_rate)
       const hourlyRate = parseFloat(
-        pessoa.valorHora || 
-        pessoa.valorPorAnalise || 
-        pessoa.hourly_rate || 
+        pessoa.valorHora ||
+        pessoa.valorPorAnalise ||
+        pessoa.hourly_rate ||
         0
       )
-      
+
       // Mapear tempoGasto (pode ser tempoGasto, tempoOperacao, tempoEntrega ou time_spent_minutes)
       // Se for tempoOperacao ou tempoEntrega, pode estar em minutos ou segundos
       let timeSpent = 0
@@ -877,12 +901,12 @@ export const indicatorServiceSupabase = {
       } else if (pessoa.time_spent_minutes !== undefined) {
         timeSpent = parseInt(pessoa.time_spent_minutes, 10)
       }
-      
+
       // Se o tempo estiver em segundos (valor > 1000), converter para minutos
       if (timeSpent > 1000) {
         timeSpent = Math.round(timeSpent / 60)
       }
-      
+
       // Mapear is_validation_only
       const isValidationOnly = pessoa.isValidationOnly || pessoa.is_validation_only || false
 
@@ -925,6 +949,7 @@ export const indicatorServiceSupabase = {
         if (custo.tipo === 'anual') {
           monthlyCost = monthlyCost / 12
         }
+        // Custo único não precisa de conversão, mantém o valor original
 
         tools.push({
           tool_name: custo.nome || custo.tool_name || '',
@@ -990,13 +1015,13 @@ export const indicatorServiceSupabase = {
       }
 
       const updateData = {}
-      
+
       // CORREÇÃO: Transformar formato antigo (info_data) para formato normalizado
       if (indicatorData.info_data) {
         const infoData = indicatorData.info_data
         if (infoData.nome !== undefined) updateData.name = infoData.nome
         if (infoData.descricao !== undefined) updateData.description = infoData.descricao
-        
+
         // Mapear tipoIndicador para improvement_type
         if (infoData.tipoIndicador !== undefined) {
           const tipoMap = {
@@ -1013,7 +1038,7 @@ export const indicatorServiceSupabase = {
           updateData.improvement_type = tipoMap[infoData.tipoIndicador] || 'productivity'
         }
       }
-      
+
       // Campos normalizados (têm prioridade sobre formato antigo se ambos estiverem presentes)
       if (indicatorData.name !== undefined) updateData.name = indicatorData.name
       if (indicatorData.description !== undefined) updateData.description = indicatorData.description
@@ -1029,11 +1054,11 @@ export const indicatorServiceSupabase = {
       // ============================================================================
       // EXTRAIR FREQUÊNCIAS DO JSONB ANTES DO UPDATE
       // ============================================================================
-      
+
       // Extrair frequências do baseline_data.pessoas[] se não foram fornecidas diretamente
       if (indicatorData.baseline_data && indicatorData.baseline_data.pessoas && Array.isArray(indicatorData.baseline_data.pessoas) && indicatorData.baseline_data.pessoas.length > 0) {
         const primeiraPessoa = indicatorData.baseline_data.pessoas[0]
-        
+
         // Extrair frequência real da primeira pessoa
         if (primeiraPessoa.frequenciaReal && primeiraPessoa.frequenciaReal.quantidade !== undefined) {
           if (!updateData.baseline_frequency_real) {
@@ -1049,7 +1074,7 @@ export const indicatorServiceSupabase = {
             updateData.frequency_unit = periodoMap[primeiraPessoa.frequenciaReal.periodo] || 'month'
           }
         }
-        
+
         // Extrair frequência desejada da primeira pessoa
         if (primeiraPessoa.frequenciaDesejada && primeiraPessoa.frequenciaDesejada.quantidade !== undefined) {
           if (!updateData.baseline_frequency_desired) {
@@ -1070,17 +1095,17 @@ export const indicatorServiceSupabase = {
 
       // Executar UPDATE apenas se houver dados para atualizar
       let updatedIndicator = oldIndicator
-      
+
       if (Object.keys(updateData).length > 0) {
         // CORREÇÃO: Remover .single() pois pode retornar 0 linhas se RLS bloquear
-      const { data, error } = await supabase
-        .from('indicators_normalized')
-        .update(updateData)
-        .eq('id', id)
-        .select()
+        const { data, error } = await supabase
+          .from('indicators_normalized')
+          .update(updateData)
+          .eq('id', id)
+          .select()
 
-      if (error) {
-        console.error('Erro ao atualizar indicador:', error)
+        if (error) {
+          console.error('Erro ao atualizar indicador:', error)
           // Verificar se é erro de RLS ou registro não encontrado
           if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
             return { success: false, error: 'Indicador não encontrado ou sem permissão para atualizar' }
@@ -1102,7 +1127,7 @@ export const indicatorServiceSupabase = {
       // ============================================================================
       // TRANSFORMAÇÃO DE FORMATO ANTIGO (JSONB) PARA FORMATO NORMALIZADO
       // ============================================================================
-      
+
       // Transformar baseline_data.pessoas[] → persons_baseline[]
       if (indicatorData.baseline_data && indicatorData.baseline_data.pessoas) {
         indicatorData.persons_baseline = this._transformPersonsFromLegacy(
@@ -1120,7 +1145,7 @@ export const indicatorServiceSupabase = {
       }
 
       // REMOVIDO: Não criar mais custom_metrics para tipos que têm colunas específicas
-      // Esses dados agora são salvos diretamente em indicator_type_specific_data
+      // Esses dados agora são salvos diretamente nas tabelas individuais por tipo (indicator_produtividade_data, etc.)
       // custom_metrics deve ser usado apenas para métricas realmente customizadas que não têm coluna específica
 
       // Transformar ia_data.ias[] + custos_data.custos[] → tools_post_ia[]
@@ -1153,7 +1178,7 @@ export const indicatorServiceSupabase = {
             let freqRealUnit = p.frequency_real_unit
             let freqDesiredQty = p.frequency_desired_quantity
             let freqDesiredUnit = p.frequency_desired_unit
-            
+
             if (indicatorData.baseline_data && indicatorData.baseline_data.pessoas && indicatorData.baseline_data.pessoas[index]) {
               const pessoa = indicatorData.baseline_data.pessoas[index]
               if (pessoa.frequenciaReal) {
@@ -1175,7 +1200,7 @@ export const indicatorServiceSupabase = {
                 freqDesiredUnit = periodoMap[pessoa.frequenciaDesejada.periodo] || freqDesiredUnit || 'month'
               }
             }
-            
+
             return {
               indicator_id: id,
               scenario: 'baseline',
@@ -1202,7 +1227,7 @@ export const indicatorServiceSupabase = {
             // Extrair frequências do post_ia_data se disponível
             let freqRealQty = p.frequency_real_quantity
             let freqRealUnit = p.frequency_real_unit
-            
+
             if (indicatorData.post_ia_data && indicatorData.post_ia_data.pessoas && indicatorData.post_ia_data.pessoas[index]) {
               const pessoa = indicatorData.post_ia_data.pessoas[index]
               if (pessoa.frequenciaReal) {
@@ -1215,7 +1240,7 @@ export const indicatorServiceSupabase = {
                 freqRealUnit = periodoMap[pessoa.frequenciaReal.periodo] || freqRealUnit || 'month'
               }
             }
-            
+
             return {
               indicator_id: id,
               scenario: 'post_ia',
@@ -1286,7 +1311,7 @@ export const indicatorServiceSupabase = {
 
       // Atualizar dados específicos por tipo de indicador
       const improvementType = updatedIndicator.improvement_type || oldIndicator.improvement_type
-      
+
       // Garantir que baselineData tenha tipo definido antes de salvar
       if (indicatorData.baseline_data && !indicatorData.baseline_data.tipo) {
         const typeMap = {
@@ -1320,7 +1345,7 @@ export const indicatorServiceSupabase = {
   },
 
   /**
-   * Salva dados específicos por tipo de indicador na tabela indicator_type_specific_data
+   * Salva dados específicos por tipo de indicador nas tabelas individuais
    */
   async _saveTypeSpecificData(indicatorId, improvementType, indicatorData) {
     if (!isSupabaseConfigured || !supabase) {
@@ -1345,190 +1370,270 @@ export const indicatorServiceSupabase = {
     }
     const mappedType = typeMap[improvementType] || baselineType
 
-    // DEBUG: Log inicial
-    console.log('🔍 _saveTypeSpecificData - INÍCIO:', {
-      indicatorId,
-      improvementType,
-      baselineType,
-      mappedType,
-      baselineData,
-      postIAData
-    })
+    let tableName = null
+    let dataToSave = { indicator_id: indicatorId }
 
-    const typeSpecificData = {
-      indicator_id: indicatorId
-    }
-
-    // Extrair dados baseado no tipo
+    // Extrair dados baseado no tipo e definir tabela
     switch (mappedType) {
+      case 'PRODUTIVIDADE':
+        tableName = 'indicator_produtividade_data'
+        // Salvar campos específicos de produtividade
+        if (postIAData.custoTotalPostIA !== undefined) {
+          dataToSave.custo_total_post_ia = parseFloat(postIAData.custoTotalPostIA) || 0
+        }
+        if (postIAData.deltaProdutividade !== undefined) {
+          dataToSave.delta_produtividade = parseFloat(postIAData.deltaProdutividade) || 0
+        }
+        if (postIAData.pessoaEnvolvida !== undefined) {
+          dataToSave.pessoa_envolvida = postIAData.pessoaEnvolvida === true
+        }
+        
+        // Salvar frequências do baseline e pós-IA
+        if (indicatorData.baseline_frequency_real !== undefined) {
+          dataToSave.baseline_frequency_real = parseInt(indicatorData.baseline_frequency_real) || null
+        }
+        if (indicatorData.baseline_frequency_desired !== undefined) {
+          dataToSave.baseline_frequency_desired = parseInt(indicatorData.baseline_frequency_desired) || null
+        }
+        if (indicatorData.post_ia_frequency !== undefined) {
+          dataToSave.post_ia_frequency = parseInt(indicatorData.post_ia_frequency) || null
+        }
+        if (indicatorData.frequency_unit) {
+          dataToSave.frequency_unit = indicatorData.frequency_unit
+        }
+        break
+
       case 'INCREMENTO RECEITA':
+        tableName = 'indicator_incremento_receita_data'
         if (baselineData.valorReceitaAntes !== undefined) {
-          typeSpecificData.revenue_before = parseFloat(baselineData.valorReceitaAntes) || null
+          dataToSave.revenue_before = parseFloat(baselineData.valorReceitaAntes) || 0
         }
         if (postIAData.valorReceitaDepois !== undefined) {
-          typeSpecificData.revenue_after = parseFloat(postIAData.valorReceitaDepois) || null
+          dataToSave.revenue_after = parseFloat(postIAData.valorReceitaDepois) || 0
         }
         break
 
       case 'MELHORIA MARGEM':
+        tableName = 'indicator_melhoria_margem_data'
         if (baselineData.receitaBrutaMensal !== undefined) {
-          typeSpecificData.gross_revenue_monthly = parseFloat(baselineData.receitaBrutaMensal) || null
+          dataToSave.gross_revenue_monthly = parseFloat(baselineData.receitaBrutaMensal) || 0
+        }
+        if (postIAData.receitaBrutaMensalEstimada !== undefined) {
+          dataToSave.receita_bruta_mensal_estimada = parseFloat(postIAData.receitaBrutaMensalEstimada) || 0
         }
         if (baselineData.custoTotalMensal !== undefined) {
-          typeSpecificData.total_cost_monthly = parseFloat(baselineData.custoTotalMensal) || null
+          dataToSave.total_cost_monthly = parseFloat(baselineData.custoTotalMensal) || 0
+        }
+        if (postIAData.custoTotalMensalEstimado !== undefined) {
+          dataToSave.custo_total_mensal_estimado = parseFloat(postIAData.custoTotalMensalEstimado) || 0
         }
         if (baselineData.margemBrutaAtual !== undefined) {
-          typeSpecificData.current_margin_percentage = parseFloat(baselineData.margemBrutaAtual) || null
+          dataToSave.current_margin_percentage = parseFloat(baselineData.margemBrutaAtual) || 0
         }
         if (postIAData.margemBrutaEstimada !== undefined) {
-          typeSpecificData.estimated_margin_percentage = parseFloat(postIAData.margemBrutaEstimada) || null
+          dataToSave.estimated_margin_percentage = parseFloat(postIAData.margemBrutaEstimada) || 0
         }
         if (baselineData.volumeTransacoes !== undefined) {
-          typeSpecificData.transaction_volume = parseInt(baselineData.volumeTransacoes) || null
+          dataToSave.transaction_volume = parseInt(baselineData.volumeTransacoes) || null
+        }
+        if (postIAData.volumeTransacoesEstimado !== undefined) {
+          dataToSave.volume_transacoes_estimado = parseInt(postIAData.volumeTransacoesEstimado) || null
         }
         break
 
       case 'REDUÇÃO DE RISCO':
+        tableName = 'indicator_reducao_risco_data'
         if (baselineData.tipoRisco !== undefined) {
-          typeSpecificData.risk_type = baselineData.tipoRisco
+          dataToSave.risk_type = baselineData.tipoRisco
         }
         if (baselineData.probabilidadeAtual !== undefined) {
-          typeSpecificData.current_probability_percentage = parseFloat(baselineData.probabilidadeAtual) || null
+          dataToSave.current_probability_percentage = parseFloat(baselineData.probabilidadeAtual) || 0
         }
         if (postIAData.probabilidadeComIA !== undefined) {
-          typeSpecificData.probability_with_ia_percentage = parseFloat(postIAData.probabilidadeComIA) || null
+          dataToSave.probability_with_ia_percentage = parseFloat(postIAData.probabilidadeComIA) || 0
         }
         if (baselineData.impactoFinanceiro !== undefined) {
-          typeSpecificData.financial_impact = parseFloat(baselineData.impactoFinanceiro) || null
+          dataToSave.financial_impact = parseFloat(baselineData.impactoFinanceiro) || 0
+        }
+        if (postIAData.impactoFinanceiroReduzido !== undefined) {
+          dataToSave.impacto_financeiro_reduzido = parseFloat(postIAData.impactoFinanceiroReduzido) || null
         }
         if (baselineData.custoMitigacaoAtual !== undefined) {
-          typeSpecificData.mitigation_cost_current = parseFloat(baselineData.custoMitigacaoAtual) || null
+          dataToSave.mitigation_cost_current = parseFloat(baselineData.custoMitigacaoAtual) || 0
         }
         if (postIAData.custoMitigacaoComIA !== undefined) {
-          typeSpecificData.mitigation_cost_with_ia = parseFloat(postIAData.custoMitigacaoComIA) || null
+          dataToSave.mitigation_cost_with_ia = parseFloat(postIAData.custoMitigacaoComIA) || 0
         }
         if (baselineData.frequenciaAvaliacao !== undefined) {
-          typeSpecificData.evaluation_frequency = parseInt(baselineData.frequenciaAvaliacao) || null
+          dataToSave.evaluation_frequency = parseInt(baselineData.frequenciaAvaliacao) || null
         }
         if (baselineData.periodoAvaliacao !== undefined) {
-          typeSpecificData.evaluation_period = baselineData.periodoAvaliacao
+          dataToSave.evaluation_period = baselineData.periodoAvaliacao
         }
+        // Custo de implementação pode vir de custos relacionados
+        // Será calculado ou obtido de outra fonte se necessário
         break
 
       case 'QUALIDADE DECISÃO':
+        tableName = 'indicator_qualidade_decisao_data'
         if (baselineData.numeroDecisoesPeriodo !== undefined) {
-          typeSpecificData.decisions_per_period = parseInt(baselineData.numeroDecisoesPeriodo) || null
+          dataToSave.decisions_per_period = parseInt(baselineData.numeroDecisoesPeriodo) || 0
         }
         if (baselineData.periodo !== undefined) {
-          typeSpecificData.decisions_period = baselineData.periodo
+          dataToSave.decisions_period = baselineData.periodo
+        }
+        if (postIAData.numeroDecisoesPeriodoComIA !== undefined) {
+          dataToSave.numero_decisoes_periodo_com_ia = parseInt(postIAData.numeroDecisoesPeriodoComIA) || null
+        }
+        if (postIAData.periodoComIA !== undefined) {
+          dataToSave.periodo_com_ia = postIAData.periodoComIA
         }
         if (baselineData.taxaAcertoAtual !== undefined) {
-          typeSpecificData.current_accuracy_percentage = parseFloat(baselineData.taxaAcertoAtual) || null
+          dataToSave.current_accuracy_percentage = parseFloat(baselineData.taxaAcertoAtual) || 0
         }
         if (postIAData.taxaAcertoComIA !== undefined) {
-          typeSpecificData.accuracy_with_ia_percentage = parseFloat(postIAData.taxaAcertoComIA) || null
+          dataToSave.accuracy_with_ia_percentage = parseFloat(postIAData.taxaAcertoComIA) || 0
         }
         if (baselineData.custoMedioDecisaoErrada !== undefined) {
-          typeSpecificData.avg_cost_wrong_decision = parseFloat(baselineData.custoMedioDecisaoErrada) || null
+          dataToSave.avg_cost_wrong_decision = parseFloat(baselineData.custoMedioDecisaoErrada) || 0
         }
         if (postIAData.custoMedioDecisaoErradaComIA !== undefined) {
-          typeSpecificData.avg_cost_wrong_decision_with_ia = parseFloat(postIAData.custoMedioDecisaoErradaComIA) || null
+          dataToSave.avg_cost_wrong_decision_with_ia = parseFloat(postIAData.custoMedioDecisaoErradaComIA) || 0
         }
         if (baselineData.tempoMedioDecisao !== undefined) {
-          typeSpecificData.avg_decision_time_minutes = parseInt(baselineData.tempoMedioDecisao) || null
+          dataToSave.avg_decision_time_minutes = parseInt(baselineData.tempoMedioDecisao) || 0
         }
         if (postIAData.tempoMedioDecisaoComIA !== undefined) {
-          typeSpecificData.avg_decision_time_with_ia_minutes = parseInt(postIAData.tempoMedioDecisaoComIA) || null
+          dataToSave.avg_decision_time_with_ia_minutes = parseInt(postIAData.tempoMedioDecisaoComIA) || 0
         }
         if (baselineData.pessoasEnvolvidas !== undefined) {
-          typeSpecificData.people_involved = parseInt(baselineData.pessoasEnvolvidas) || null
+          dataToSave.people_involved = parseInt(baselineData.pessoasEnvolvidas) || 0
         }
         if (postIAData.pessoasEnvolvidasComIA !== undefined) {
-          typeSpecificData.people_involved_with_ia = parseInt(postIAData.pessoasEnvolvidasComIA) || null
+          dataToSave.people_involved_with_ia = parseInt(postIAData.pessoasEnvolvidasComIA) || 0
         }
         if (baselineData.valorHoraMedio !== undefined) {
-          typeSpecificData.avg_hourly_rate = parseFloat(baselineData.valorHoraMedio) || null
+          dataToSave.avg_hourly_rate = parseFloat(baselineData.valorHoraMedio) || 0
         }
         break
 
       case 'VELOCIDADE':
+        tableName = 'indicator_velocidade_data'
         if (baselineData.tempoMedioEntregaAtual !== undefined) {
-          typeSpecificData.current_delivery_time = parseFloat(baselineData.tempoMedioEntregaAtual) || null
+          dataToSave.current_delivery_time = parseFloat(baselineData.tempoMedioEntregaAtual) || 0
         }
         if (postIAData.tempoMedioEntregaComIA !== undefined) {
-          typeSpecificData.delivery_time_with_ia = parseFloat(postIAData.tempoMedioEntregaComIA) || null
+          dataToSave.delivery_time_with_ia = parseFloat(postIAData.tempoMedioEntregaComIA) || 0
+          dataToSave.tempo_medio_entrega_com_ia = parseFloat(postIAData.tempoMedioEntregaComIA) || 0
         }
         if (baselineData.unidadeTempoEntrega !== undefined) {
-          typeSpecificData.delivery_time_unit = baselineData.unidadeTempoEntrega
+          dataToSave.delivery_time_unit = baselineData.unidadeTempoEntrega
+        }
+        if (postIAData.unidadeTempoEntregaComIA !== undefined) {
+          dataToSave.unidade_tempo_entrega_com_ia = postIAData.unidadeTempoEntregaComIA
         }
         if (baselineData.numeroEntregasPeriodo !== undefined) {
-          typeSpecificData.deliveries_per_period = parseInt(baselineData.numeroEntregasPeriodo) || null
+          dataToSave.deliveries_per_period = parseInt(baselineData.numeroEntregasPeriodo) || 0
+        }
+        if (postIAData.numeroEntregasPeriodoComIA !== undefined) {
+          dataToSave.numero_entregas_periodo_com_ia = parseInt(postIAData.numeroEntregasPeriodoComIA) || null
         }
         if (baselineData.periodoEntregas !== undefined) {
-          typeSpecificData.deliveries_period = baselineData.periodoEntregas
+          dataToSave.deliveries_period = baselineData.periodoEntregas
+        }
+        if (postIAData.periodoEntregasComIA !== undefined) {
+          dataToSave.periodo_entregas_com_ia = postIAData.periodoEntregasComIA
         }
         if (baselineData.custoPorAtraso !== undefined) {
-          typeSpecificData.cost_per_delay = parseFloat(baselineData.custoPorAtraso) || null
+          dataToSave.cost_per_delay = parseFloat(baselineData.custoPorAtraso) || 0
         }
         if (postIAData.custoPorAtrasoReduzido !== undefined) {
-          typeSpecificData.cost_per_delay_reduced = parseFloat(postIAData.custoPorAtrasoReduzido) || null
+          dataToSave.cost_per_delay_reduced = parseFloat(postIAData.custoPorAtrasoReduzido) || 0
         }
         if (baselineData.tempoTrabalhoPorEntrega !== undefined) {
-          typeSpecificData.work_time_per_delivery_hours = parseFloat(baselineData.tempoTrabalhoPorEntrega) || null
+          dataToSave.work_time_per_delivery_hours = parseFloat(baselineData.tempoTrabalhoPorEntrega) || 0
         }
         if (postIAData.tempoTrabalhoPorEntregaComIA !== undefined) {
-          typeSpecificData.work_time_per_delivery_with_ia_hours = parseFloat(postIAData.tempoTrabalhoPorEntregaComIA) || null
+          dataToSave.work_time_per_delivery_with_ia_hours = parseFloat(postIAData.tempoTrabalhoPorEntregaComIA) || 0
+        }
+        if (baselineData.pessoasEnvolvidas !== undefined) {
+          dataToSave.pessoas_envolvidas = parseInt(baselineData.pessoasEnvolvidas) || 0
+        }
+        if (postIAData.pessoasEnvolvidasComIA !== undefined) {
+          dataToSave.pessoas_envolvidas_com_ia = parseInt(postIAData.pessoasEnvolvidasComIA) || 0
+        }
+        if (baselineData.valorHoraMedio !== undefined) {
+          dataToSave.valor_hora_medio = parseFloat(baselineData.valorHoraMedio) || 0
         }
         break
 
       case 'SATISFAÇÃO':
+        tableName = 'indicator_satisfacao_data'
         if (baselineData.scoreAtual !== undefined) {
-          typeSpecificData.current_score = parseFloat(baselineData.scoreAtual) || null
+          dataToSave.current_score = parseFloat(baselineData.scoreAtual) || 0
         }
         if (postIAData.scoreComIA !== undefined) {
-          typeSpecificData.score_with_ia = parseFloat(postIAData.scoreComIA) || null
+          dataToSave.score_with_ia = parseFloat(postIAData.scoreComIA) || 0
         }
         if (baselineData.tipoScore !== undefined) {
-          typeSpecificData.score_type = baselineData.tipoScore
+          dataToSave.score_type = baselineData.tipoScore
+        }
+        if (postIAData.tipoScore !== undefined) {
+          dataToSave.score_type = postIAData.tipoScore
         }
         if (baselineData.numeroClientes !== undefined) {
-          typeSpecificData.number_of_customers = parseInt(baselineData.numeroClientes) || null
+          dataToSave.number_of_customers = parseInt(baselineData.numeroClientes) || 0
+        }
+        if (postIAData.numeroClientesEsperado !== undefined) {
+          dataToSave.numero_clientes_esperado = parseInt(postIAData.numeroClientesEsperado) || null
         }
         if (baselineData.valorMedioPorCliente !== undefined) {
-          typeSpecificData.avg_value_per_customer = parseFloat(baselineData.valorMedioPorCliente) || null
+          dataToSave.avg_value_per_customer = parseFloat(baselineData.valorMedioPorCliente) || 0
+        }
+        if (postIAData.valorMedioPorClienteComIA !== undefined) {
+          dataToSave.valor_medio_por_cliente_com_ia = parseFloat(postIAData.valorMedioPorClienteComIA) || 0
         }
         if (baselineData.taxaChurnAtual !== undefined) {
-          typeSpecificData.current_churn_rate_percentage = parseFloat(baselineData.taxaChurnAtual) || null
+          dataToSave.current_churn_rate_percentage = parseFloat(baselineData.taxaChurnAtual) || 0
         }
         if (postIAData.taxaChurnComIA !== undefined) {
-          typeSpecificData.churn_rate_with_ia_percentage = parseFloat(postIAData.taxaChurnComIA) || null
+          dataToSave.churn_rate_with_ia_percentage = parseFloat(postIAData.taxaChurnComIA) || 0
         }
         if (baselineData.custoAquisicaoCliente !== undefined) {
-          typeSpecificData.customer_acquisition_cost = parseFloat(baselineData.custoAquisicaoCliente) || null
+          dataToSave.customer_acquisition_cost = parseFloat(baselineData.custoAquisicaoCliente) || null
         }
         if (baselineData.ticketMedioSuporte !== undefined) {
-          typeSpecificData.avg_support_tickets_per_month = parseInt(baselineData.ticketMedioSuporte) || null
+          dataToSave.avg_support_tickets_per_month = parseInt(baselineData.ticketMedioSuporte) || 0
+        }
+        if (postIAData.ticketMedioSuporteComIA !== undefined) {
+          dataToSave.ticket_medio_suporte_com_ia = parseInt(postIAData.ticketMedioSuporteComIA) || null
         }
         break
 
       case 'CAPACIDADE ANALÍTICA':
+        tableName = 'indicator_capacidade_analitica_data'
         if (baselineData.quantidadeAnalises !== undefined) {
-          typeSpecificData.analyses_before = parseInt(baselineData.quantidadeAnalises) || null
+          dataToSave.analyses_before = parseInt(baselineData.quantidadeAnalises) || 0
         }
         if (postIAData.quantidadeAnalises !== undefined) {
-          typeSpecificData.analyses_after = parseInt(postIAData.quantidadeAnalises) || null
+          dataToSave.analyses_after = parseInt(postIAData.quantidadeAnalises) || 0
         }
         if (baselineData.valorPorAnalise !== undefined) {
-          typeSpecificData.value_per_analysis = parseFloat(baselineData.valorPorAnalise) || null
+          dataToSave.value_per_analysis = parseFloat(baselineData.valorPorAnalise) || 0
         }
         break
     }
 
+    if (!tableName) {
+      console.warn('⚠️ _saveTypeSpecificData: Tipo não reconhecido', mappedType)
+      return
+    }
+
     // Remover indicator_id do objeto antes de fazer upsert
-    const { indicator_id, ...dataToSave } = typeSpecificData
+    const { indicator_id, ...fieldsToSave } = dataToSave
 
     // Verificar se há dados para salvar (além do indicator_id)
-    if (Object.keys(dataToSave).length === 0) {
+    if (Object.keys(fieldsToSave).length === 0 && mappedType !== 'PRODUTIVIDADE') {
       console.warn('⚠️ _saveTypeSpecificData: Nenhum dado para salvar', {
         indicatorId,
         mappedType,
@@ -1538,30 +1643,236 @@ export const indicatorServiceSupabase = {
       return
     }
 
-    // DEBUG: Log antes de salvar
-    console.log('💾 _saveTypeSpecificData - Salvando:', {
-      indicatorId,
-      mappedType,
-      dataToSave,
-      hasData: Object.keys(dataToSave).length > 0
-    })
-
-    // Upsert na tabela indicator_type_specific_data
+    // Upsert na tabela específica do tipo
     const { data, error } = await supabase
-      .from('indicator_type_specific_data')
-      .upsert({
-        indicator_id: indicatorId,
-        ...dataToSave
-      }, {
+      .from(tableName)
+      .upsert(dataToSave, {
         onConflict: 'indicator_id'
       })
+      .select()
 
     if (error) {
-      console.error('❌ Erro ao salvar dados específicos do tipo:', error)
-      console.error('Dados que tentaram ser salvos:', { indicatorId, ...dataToSave })
+      console.error(`❌ Erro ao salvar dados específicos do tipo (${mappedType}):`, error)
+      console.error('Dados que tentaram ser salvos:', dataToSave)
       // Não falha a operação principal se houver erro aqui
     } else {
-      console.log('✅ Dados específicos salvos com sucesso:', data)
+      console.log(`✅ Dados específicos salvos com sucesso (${mappedType}):`, data)
+    }
+
+    // Recalcular métricas usando database function (mais confiável)
+    // A função do banco lê os dados diretamente das tabelas e calcula
+    try {
+      const { error: calcError } = await supabase.rpc('calculate_indicator_metrics', {
+        p_indicator_id: indicatorId
+      })
+
+      if (calcError) {
+        console.error(`Erro ao calcular métricas via database function:`, calcError)
+        // Fallback: tentar salvar via método antigo se database function falhar
+        await this._saveCalculatedMetrics(indicatorId, mappedType, baselineData, postIAData)
+      }
+    } catch (error) {
+      console.error(`Erro ao chamar calculate_indicator_metrics:`, error)
+      // Fallback: tentar salvar via método antigo
+      await this._saveCalculatedMetrics(indicatorId, mappedType, baselineData, postIAData)
+    }
+  },
+
+  /**
+   * Busca dados específicos do tipo de indicador das tabelas individuais
+   */
+  async _getTypeSpecificData(indicatorId, improvementType) {
+    if (!isSupabaseConfigured || !supabase) {
+      return null
+    }
+
+    // Mapear improvement_type para tipo e tabela
+    const typeMap = {
+      'productivity': { type: 'PRODUTIVIDADE', table: 'indicator_produtividade_data' },
+      'analytical_capacity': { type: 'CAPACIDADE ANALÍTICA', table: 'indicator_capacidade_analitica_data' },
+      'revenue_increase': { type: 'INCREMENTO RECEITA', table: 'indicator_incremento_receita_data' },
+      'margin_improvement': { type: 'MELHORIA MARGEM', table: 'indicator_melhoria_margem_data' },
+      'risk_reduction': { type: 'REDUÇÃO DE RISCO', table: 'indicator_reducao_risco_data' },
+      'decision_quality': { type: 'QUALIDADE DECISÃO', table: 'indicator_qualidade_decisao_data' },
+      'speed': { type: 'VELOCIDADE', table: 'indicator_velocidade_data' },
+      'satisfaction': { type: 'SATISFAÇÃO', table: 'indicator_satisfacao_data' }
+    }
+
+    const typeInfo = typeMap[improvementType]
+    if (!typeInfo) {
+      return null
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(typeInfo.table)
+        .select('*')
+        .eq('indicator_id', indicatorId)
+        .maybeSingle()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error(`Erro ao buscar dados específicos (${typeInfo.type}):`, error)
+        return null
+      }
+
+      return data || null
+    } catch (error) {
+      console.error(`Erro ao buscar dados específicos (${typeInfo.type}):`, error)
+      return null
+    }
+  },
+
+  /**
+   * Salva métricas calculadas na tabela indicator_calculated_metrics
+   */
+  async _saveCalculatedMetrics(indicatorId, mappedType, baselineData, postIAData) {
+    if (!isSupabaseConfigured || !supabase) {
+      return
+    }
+
+    const calculatedMetrics = {
+      indicator_id: indicatorId
+    }
+
+    switch (mappedType) {
+      case 'PRODUTIVIDADE':
+        if (postIAData.deltaProdutividade !== undefined) {
+          calculatedMetrics.delta_produtividade = parseFloat(postIAData.deltaProdutividade) || 0
+        }
+        // Calcular horas economizadas se disponível
+        if (postIAData.horasEconomizadasMes !== undefined) {
+          calculatedMetrics.horas_economizadas_mes = parseFloat(postIAData.horasEconomizadasMes) || 0
+        }
+        if (postIAData.horasEconomizadasAno !== undefined) {
+          calculatedMetrics.horas_economizadas_ano = parseFloat(postIAData.horasEconomizadasAno) || 0
+        }
+        if (baselineData.custoTotalBaseline !== undefined) {
+          calculatedMetrics.custo_total_baseline = parseFloat(baselineData.custoTotalBaseline) || 0
+        }
+        if (postIAData.custoTotalPostIA !== undefined) {
+          calculatedMetrics.custo_total_post_ia = parseFloat(postIAData.custoTotalPostIA) || 0
+        }
+        break
+
+      case 'INCREMENTO RECEITA':
+        if (baselineData.valorReceitaAntes !== undefined && postIAData.valorReceitaDepois !== undefined) {
+          const receitaAntes = parseFloat(baselineData.valorReceitaAntes) || 0
+          const receitaDepois = parseFloat(postIAData.valorReceitaDepois) || 0
+          calculatedMetrics.delta_receita = receitaDepois - receitaAntes
+        }
+        break
+
+      case 'MELHORIA MARGEM':
+        if (postIAData.deltaMargem !== undefined) {
+          calculatedMetrics.delta_margem = parseFloat(postIAData.deltaMargem) || 0
+        }
+        if (postIAData.deltaMargemReais !== undefined) {
+          calculatedMetrics.delta_margem_reais = parseFloat(postIAData.deltaMargemReais) || 0
+        }
+        if (postIAData.economiaMensal !== undefined) {
+          calculatedMetrics.economia_mensal = parseFloat(postIAData.economiaMensal) || 0
+        }
+        if (postIAData.economiaAnual !== undefined) {
+          calculatedMetrics.economia_anual = parseFloat(postIAData.economiaAnual) || 0
+        }
+        break
+
+      case 'REDUÇÃO DE RISCO':
+        if (postIAData.reducaoProbabilidade !== undefined) {
+          calculatedMetrics.reducao_probabilidade = parseFloat(postIAData.reducaoProbabilidade) || 0
+        }
+        if (postIAData.valorRiscoEvitado !== undefined) {
+          calculatedMetrics.valor_risco_evitado = parseFloat(postIAData.valorRiscoEvitado) || 0
+        }
+        if (postIAData.economiaMitigacao !== undefined) {
+          calculatedMetrics.economia_mitigacao = parseFloat(postIAData.economiaMitigacao) || 0
+        }
+        if (postIAData.beneficioAnual !== undefined) {
+          calculatedMetrics.beneficio_anual = parseFloat(postIAData.beneficioAnual) || 0
+        }
+        if (postIAData.custoVsBeneficio !== undefined) {
+          calculatedMetrics.custo_vs_beneficio = parseFloat(postIAData.custoVsBeneficio) || 0
+        }
+        if (postIAData.roiReducaoRisco !== undefined) {
+          calculatedMetrics.roi_reducao_risco = parseFloat(postIAData.roiReducaoRisco) || 0
+        }
+        break
+
+      case 'QUALIDADE DECISÃO':
+        if (postIAData.melhoriaTaxaAcerto !== undefined) {
+          calculatedMetrics.melhoria_taxa_acerto = parseFloat(postIAData.melhoriaTaxaAcerto) || 0
+        }
+        if (postIAData.economiaErrosEvitados !== undefined) {
+          calculatedMetrics.economia_erros_evitados = parseFloat(postIAData.economiaErrosEvitados) || 0
+        }
+        if (postIAData.economiaTempo !== undefined) {
+          calculatedMetrics.economia_tempo = parseFloat(postIAData.economiaTempo) || 0
+        }
+        if (postIAData.valorTempoEconomizado !== undefined) {
+          calculatedMetrics.valor_tempo_economizado = parseFloat(postIAData.valorTempoEconomizado) || 0
+        }
+        if (postIAData.beneficioTotalMensal !== undefined) {
+          calculatedMetrics.beneficio_total_mensal = parseFloat(postIAData.beneficioTotalMensal) || 0
+        }
+        if (postIAData.roiMelhoria !== undefined) {
+          calculatedMetrics.roi_melhoria = parseFloat(postIAData.roiMelhoria) || 0
+        }
+        break
+
+      case 'VELOCIDADE':
+        if (postIAData.reducaoTempoEntrega !== undefined) {
+          calculatedMetrics.reducao_tempo_entrega = parseFloat(postIAData.reducaoTempoEntrega) || 0
+        }
+        if (postIAData.aumentoCapacidade !== undefined) {
+          calculatedMetrics.aumento_capacidade = parseInt(postIAData.aumentoCapacidade) || 0
+        }
+        if (postIAData.economiaAtrasos !== undefined) {
+          calculatedMetrics.economia_atrasos = parseFloat(postIAData.economiaAtrasos) || 0
+        }
+        if (postIAData.valorTempoEconomizado !== undefined) {
+          calculatedMetrics.valor_tempo_economizado_velocidade = parseFloat(postIAData.valorTempoEconomizado) || 0
+        }
+        if (postIAData.ganhoProdutividade !== undefined) {
+          calculatedMetrics.ganho_produtividade = parseFloat(postIAData.ganhoProdutividade) || 0
+        }
+        if (postIAData.roiVelocidade !== undefined) {
+          calculatedMetrics.roi_velocidade = parseFloat(postIAData.roiVelocidade) || 0
+        }
+        break
+
+      case 'SATISFAÇÃO':
+        if (postIAData.deltaSatisfacao !== undefined) {
+          calculatedMetrics.delta_satisfacao = parseFloat(postIAData.deltaSatisfacao) || 0
+        }
+        if (postIAData.reducaoChurn !== undefined) {
+          calculatedMetrics.reducao_churn = parseFloat(postIAData.reducaoChurn) || 0
+        }
+        if (postIAData.valorRetencao !== undefined) {
+          calculatedMetrics.valor_retencao = parseFloat(postIAData.valorRetencao) || 0
+        }
+        if (postIAData.economiaSuporte !== undefined) {
+          calculatedMetrics.economia_suporte = parseFloat(postIAData.economiaSuporte) || 0
+        }
+        if (postIAData.aumentoRevenue !== undefined) {
+          calculatedMetrics.aumento_revenue = parseFloat(postIAData.aumentoRevenue) || 0
+        }
+        if (postIAData.roiSatisfacao !== undefined) {
+          calculatedMetrics.roi_satisfacao = parseFloat(postIAData.roiSatisfacao) || 0
+        }
+        if (postIAData.ltvIncrementado !== undefined) {
+          calculatedMetrics.ltv_incrementado = parseFloat(postIAData.ltvIncrementado) || 0
+        }
+        break
+
+      case 'CAPACIDADE ANALÍTICA':
+        // Para capacidade analítica, as métricas são calculadas pelo serviço de métricas
+        // Se houver métricas calculadas no postIAData, podem ser salvas aqui
+        break
+    }
+
+    // Salvar métricas calculadas usando o serviço
+    if (Object.keys(calculatedMetrics).length > 1) { // Mais que apenas indicator_id
+      await indicatorCalculatedMetricsService.upsertMetrics(indicatorId, calculatedMetrics)
     }
   },
 

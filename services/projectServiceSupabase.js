@@ -84,7 +84,7 @@ export const projectServiceSupabase = {
       let user = null
       try {
         const userPromise = userServiceSupabase.getById(session.user.id)
-        const userTimeout = new Promise((_, reject) => 
+        const userTimeout = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), 3000)
         )
         user = await Promise.race([userPromise, userTimeout])
@@ -104,14 +104,14 @@ export const projectServiceSupabase = {
           return { success: false, error: 'Não foi possível obter organização do usuário' }
         }
       }
-      
+
       if (!user || !user.organization_id) {
         return { success: false, error: 'Usuário não possui organização associada' }
       }
 
       // Preparar dados do projeto
       const businessAreaValue = projectData.business_area || projectData.department || null
-      
+
       const insertData = {
         organization_id: user.organization_id,
         name: projectData.name,

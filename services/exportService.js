@@ -492,10 +492,11 @@ export const exportService = {
             ]
 
             custos.forEach(custo => {
+              const tipoLabel = custo.tipo === 'mensal' ? 'Mensal' : custo.tipo === 'anual' ? 'Anual' : custo.tipo === 'unico' ? 'Único' : 'Mensal'
               custosTable.push([
                 custo.nome || '',
                 formatarMoeda(custo.valor || 0),
-                custo.tipo === 'mensal' ? 'Mensal' : 'Anual'
+                tipoLabel
               ])
             })
 

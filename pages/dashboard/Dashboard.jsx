@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import { correlationService } from '../../services/correlationService'
 import { calcularMetricasPorTipo, calcularMetricasProdutividade, calcularMetricasIncrementoReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, calcularMetricasSatisfacao, calcularMetricasCapacidadeAnalitica } from '../../services/indicatorMetricsService'
+import { indicatorCalculatedMetricsService } from '../../services/indicatorCalculatedMetricsService'
 import Card from '../../components/common/Card'
 import Loading from '../../components/common/Loading'
 import Button from '../../components/common/Button'
@@ -21,9 +22,11 @@ import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, for
 import { obterNomeIndicador, normalizarTipoIndicador } from '../../utils/indicatorUtils'
 
 const Dashboard = () => {
-  const { id } = useParams()
+  const params = useParams()
+  const id = params?.id
   const navigate = useNavigate()
   const { getProjectById, getIndicatorsByProjectId, getIndicatorById, calculateProjectROI, loading } = useData()
+
 
   const project = getProjectById(id)
   const [indicators, setIndicators] = useState([])
@@ -31,6 +34,7 @@ const Dashboard = () => {
   const [completeIndicators, setCompleteIndicators] = useState([])
   const [metricas, setMetricas] = useState(null)
   const [metricasLoading, setMetricasLoading] = useState(false)
+  const [calculatedMetricsMap, setCalculatedMetricsMap] = useState({}) // Mapa de métricas calculadas por indicator_id
 
   // Carrega indicadores completos (com baselineData e postIAData)
   useEffect(() => {
@@ -77,6 +81,45 @@ const Dashboard = () => {
 
     loadCompleteIndicators()
   }, [id, getIndicatorsByProjectId, getIndicatorById])
+
+  // Busca métricas calculadas de indicator_calculated_metrics
+  useEffect(() => {
+    const loadCalculatedMetrics = async () => {
+      if (completeIndicators.length === 0) {
+        setCalculatedMetricsMap({})
+        return
+      }
+
+      try {
+        const indicatorIds = completeIndicators
+          .filter(ind => ind && ind.id)
+          .map(ind => ind.id)
+
+        if (indicatorIds.length === 0) {
+          setCalculatedMetricsMap({})
+          return
+        }
+
+        // Busca métricas calculadas para todos os indicadores de uma vez
+        const calculatedMetrics = await indicatorCalculatedMetricsService.getByIndicatorIds(indicatorIds)
+
+        // Cria mapa de métricas por indicator_id
+        const metricsMap = {}
+        calculatedMetrics.forEach(metric => {
+          if (metric && metric.indicator_id) {
+            metricsMap[metric.indicator_id] = metric
+          }
+        })
+
+        setCalculatedMetricsMap(metricsMap)
+      } catch (error) {
+        console.error('Erro ao buscar métricas calculadas:', error)
+        setCalculatedMetricsMap({})
+      }
+    }
+
+    loadCalculatedMetrics()
+  }, [completeIndicators])
 
   // Calcula métricas do projeto de forma assíncrona
   useEffect(() => {
@@ -399,42 +442,59 @@ const Dashboard = () => {
     <div>
       {/* Cards de KPI - Movidos para o topo */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <KPICard
-          label="Economia Líquida/Ano"
-          value={formatarMoeda(metricas.economiaAnualTotal || 0)}
-          icon="fas fa-piggy-bank"
-          color="green"
-          isPositive={(metricas.economiaAnualTotal || 0) >= 0}
-        />
+        {(metricas.economiaAnualTotal && metricas.economiaAnualTotal !== 0) && (
+          <KPICard
+            label="Economia Líquida/Ano"
+            value={formatarMoeda(metricas.economiaAnualTotal)}
+            icon="fas fa-piggy-bank"
+            color="green"
+            isPositive={metricas.economiaAnualTotal >= 0}
+          />
+        )}
 
-        <KPICard
-          label="Tempo Economizado"
-          value={formatarHoras(metricas.tempoEconomizadoAnualHoras || 0)}
-          icon="fas fa-clock"
-          color="cyan"
-          subLabel="/ano"
-        />
+        {(metricas.tempoEconomizadoAnualHoras && metricas.tempoEconomizadoAnualHoras !== 0) && (
+          <KPICard
+            label="Tempo Economizado"
+            value={formatarHoras(metricas.tempoEconomizadoAnualHoras)}
+            icon="fas fa-clock"
+            color="cyan"
+            subLabel="/ano"
+          />
+        )}
 
-        <KPICard
-          label="ROI 1º Ano"
-          value={formatarROI(metricas.roiGeral || 0)}
-          icon="fas fa-chart-line"
-          color="purple"
-          isPositive={(metricas.roiGeral || 0) >= 0}
-        />
+        {(metricas.roiGeral !== null && metricas.roiGeral !== undefined && !isNaN(metricas.roiGeral)) && (
+          <KPICard
+            label="ROI 1º Ano"
+            value={formatarROI(metricas.roiGeral)}
+            icon="fas fa-chart-line"
+            color="purple"
+            isPositive={metricas.roiGeral >= 0}
+          />
+        )}
 
-        <KPICard
-          label="Payback Médio"
-          value={formatarPayback(metricas.paybackMedioMeses || Infinity)}
-          icon="fas fa-sync-alt"
-          color="blue"
-        />
+        {(metricas.paybackMedioMeses && metricas.paybackMedioMeses !== Infinity && !isNaN(metricas.paybackMedioMeses)) && (
+          <KPICard
+            label="Payback Médio"
+            value={formatarPayback(metricas.paybackMedioMeses)}
+            icon="fas fa-sync-alt"
+            color="blue"
+          />
+        )}
       </div>
 
       {/* Cards Individuais por Indicador */}
-      {completeIndicators.map((indicador) => {
+      {completeIndicators
+        .filter((indicador) => {
+          // Filtrar apenas indicadores que têm métricas calculadas
+          const calculatedMetrics = calculatedMetricsMap[indicador.id]
+          return calculatedMetrics && Object.keys(calculatedMetrics).length > 0
+        })
+        .map((indicador) => {
         const tipoIndicador = normalizarTipoIndicador(indicador) || 'Produtividade'
         const nomeIndicador = obterNomeIndicador(indicador)
+
+        // Busca métricas calculadas do banco de dados
+        const calculatedMetrics = calculatedMetricsMap[indicador.id] || null
 
         // Encontra a métrica específica deste indicador
         const metricaDetalhada = metricas?.indicadoresDetalhados?.find(item =>
@@ -485,31 +545,113 @@ const Dashboard = () => {
           )
         }
 
-        // Se não encontrou métrica por tipo, tenta calcular agora
-        if (!metricaPorTipo) {
-          let metricaCalculada = null
-
+        // Prioriza métricas calculadas do banco se disponíveis (mais confiáveis)
+        // Sempre usa dados do banco quando disponíveis, pois são calculados automaticamente
+        if (calculatedMetrics) {
           if (tipoIndicador === 'Produtividade') {
-            metricaCalculada = calcularMetricasProdutividade(indicador)
+            // Sempre prioriza dados do banco para produtividade
+            metricaPorTipo = {
+              ...(metricaPorTipo || {}),
+              nome: nomeIndicador,
+              indicadorNome: nomeIndicador,
+              // Prioriza dados do banco, mas mantém dados calculados no frontend como fallback
+              deltaProdutividade: calculatedMetrics.delta_produtividade ?? metricaPorTipo?.deltaProdutividade ?? 0,
+              delta_produtividade: calculatedMetrics.delta_produtividade ?? 0,
+              horasEconomizadasMes: calculatedMetrics.horas_economizadas_mes ?? metricaPorTipo?.horasEconomizadasMes ?? 0,
+              horas_economizadas_mes: calculatedMetrics.horas_economizadas_mes ?? 0,
+              horasEconomizadasAno: calculatedMetrics.horas_economizadas_ano ?? metricaPorTipo?.horasEconomizadasAno ?? 0,
+              horas_economizadas_ano: calculatedMetrics.horas_economizadas_ano ?? 0,
+              custoTotalBaseline: calculatedMetrics.custo_total_baseline ?? metricaPorTipo?.custoTotalBaseline ?? 0,
+              custo_total_baseline: calculatedMetrics.custo_total_baseline ?? 0,
+              custoTotalPostIA: calculatedMetrics.custo_total_post_ia ?? metricaPorTipo?.custoTotalPostIA ?? 0,
+              custo_total_post_ia: calculatedMetrics.custo_total_post_ia ?? 0
+            }
           } else if (tipoIndicador === 'Incremento Receita') {
-            metricaCalculada = calcularMetricasIncrementoReceita(indicador)
+            if (!metricaPorTipo || !metricaPorTipo.deltaReceita || metricaPorTipo.deltaReceita === 0) {
+              metricaPorTipo = {
+                ...(metricaPorTipo || {}),
+                nome: nomeIndicador,
+                deltaReceita: calculatedMetrics.delta_receita || 0
+              }
+            }
           } else if (tipoIndicador === 'Melhoria Margem') {
-            metricaCalculada = calcularMetricasMelhoriaMargem(indicador)
+            if (!metricaPorTipo) {
+              metricaPorTipo = {
+                nome: nomeIndicador,
+                deltaMargem: calculatedMetrics.delta_margem || 0,
+                deltaMargemReais: calculatedMetrics.delta_margem_reais || 0,
+                economiaMensal: calculatedMetrics.economia_mensal || 0,
+                economiaAnual: calculatedMetrics.economia_anual || 0
+              }
+            }
           } else if (tipoIndicador === 'Redução de Risco') {
-            metricaCalculada = calcularMetricasReducaoRisco(indicador)
+            if (!metricaPorTipo) {
+              metricaPorTipo = {
+                nome: nomeIndicador,
+                reducaoProbabilidade: calculatedMetrics.reducao_probabilidade || 0,
+                valorRiscoEvitado: calculatedMetrics.valor_risco_evitado || 0,
+                economiaMitigacao: calculatedMetrics.economia_mitigacao || 0,
+                beneficioAnual: calculatedMetrics.beneficio_anual || 0,
+                custoVsBeneficio: calculatedMetrics.custo_vs_beneficio || 0,
+                roiReducaoRisco: calculatedMetrics.roi_reducao_risco || 0
+              }
+            }
           } else if (tipoIndicador === 'Qualidade Decisão') {
-            metricaCalculada = calcularMetricasQualidadeDecisao(indicador)
+            if (!metricaPorTipo) {
+              metricaPorTipo = {
+                nome: nomeIndicador,
+                melhoriaTaxaAcerto: calculatedMetrics.melhoria_taxa_acerto || 0,
+                economiaErrosEvitados: calculatedMetrics.economia_erros_evitados || 0,
+                economiaTempo: calculatedMetrics.economia_tempo || 0,
+                valorTempoEconomizado: calculatedMetrics.valor_tempo_economizado || 0,
+                beneficioTotalMensal: calculatedMetrics.beneficio_total_mensal || 0,
+                roiMelhoria: calculatedMetrics.roi_melhoria || 0
+              }
+            }
           } else if (tipoIndicador === 'Velocidade') {
-            metricaCalculada = calcularMetricasVelocidade(indicador)
+            if (!metricaPorTipo) {
+              metricaPorTipo = {
+                nome: nomeIndicador,
+                reducaoTempoEntrega: calculatedMetrics.reducao_tempo_entrega || 0,
+                aumentoCapacidade: calculatedMetrics.aumento_capacidade || 0,
+                economiaAtrasos: calculatedMetrics.economia_atrasos || 0,
+                valorTempoEconomizado: calculatedMetrics.valor_tempo_economizado_velocidade || 0,
+                ganhoProdutividade: calculatedMetrics.ganho_produtividade || 0,
+                roiVelocidade: calculatedMetrics.roi_velocidade || 0
+              }
+            }
           } else if (tipoIndicador === 'Satisfação') {
-            metricaCalculada = calcularMetricasSatisfacao(indicador)
-          } else if (tipoIndicador === 'Capacidade Analítica') {
-            metricaCalculada = calcularMetricasCapacidadeAnalitica(indicador)
+            if (!metricaPorTipo) {
+              metricaPorTipo = {
+                nome: nomeIndicador,
+                deltaSatisfacao: calculatedMetrics.delta_satisfacao || 0,
+                reducaoChurn: calculatedMetrics.reducao_churn || 0,
+                valorRetencao: calculatedMetrics.valor_retencao || 0,
+                economiaSuporte: calculatedMetrics.economia_suporte || 0,
+                aumentoRevenue: calculatedMetrics.aumento_revenue || 0,
+                roisatisfacao: calculatedMetrics.roi_satisfacao || 0,
+                ltvIncrementado: calculatedMetrics.ltv_incrementado || 0
+              }
+            }
           }
+        }
 
-          if (metricaCalculada) {
-            metricaPorTipo = metricaCalculada
-          }
+        // Se não há métricas calculadas do banco, não exibe o indicador
+        // O dashboard mostra apenas indicadores com dados calculados salvos
+        if (!calculatedMetrics) {
+          return null
+        }
+
+        // Verifica se há pelo menos uma métrica com valor não-zero
+        const hasData = Object.values(calculatedMetrics).some(value => {
+          if (value === null || value === undefined) return false
+          if (typeof value === 'number' && value !== 0) return true
+          if (typeof value === 'string' && value.trim() !== '') return true
+          return false
+        })
+
+        if (!hasData) {
+          return null
         }
 
         // Renderiza card baseado no tipo

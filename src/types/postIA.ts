@@ -105,7 +105,7 @@ export interface PostIAReducaoRisco {
 export interface PostIAQualidadeDecisao {
   tipo: 'QUALIDADE DECISÃO'
   numeroDecisoesPeriodoComIA: number      // quantidade de decisões com IA
-  periodoComIA: 'dia' | 'semana' | 'mês' // período de referência
+  periodoComIA: 'dia' | 'semana' | 'mês' | 'ano' // período de referência
   taxaAcertoComIA: number                 // % (0-100)
   custoMedioDecisaoErradaComIA: number    // R$
   tempoMedioDecisaoComIA: number          // em minutos

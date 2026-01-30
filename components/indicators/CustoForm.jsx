@@ -49,6 +49,7 @@ const CustoForm = ({ custo, index, onUpdate, onRemove }) => {
           >
             <option value="mensal">Mensal</option>
             <option value="anual">Anual</option>
+            <option value="unico">Único</option>
           </select>
         </div>
       </div>
