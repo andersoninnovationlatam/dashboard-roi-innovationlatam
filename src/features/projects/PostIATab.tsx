@@ -292,6 +292,16 @@ export const PostIATab = ({
   useEffect(() => {
     // Se já existe postIAData salvo, usa ele mas recalcula deltaProdutividade se necessário
     if (postIAData) {
+      // Se for PRODUTIVIDADE e pessoaEnvolvida for false, remove pessoas do baseline
+      if (postIAData.tipo === 'PRODUTIVIDADE' && 'pessoas' in postIAData && postIAData.pessoaEnvolvida === false) {
+        const isPessoaManual = (id: string): boolean => id.startsWith('manual-')
+        const pessoasManuais = postIAData.pessoas.filter(p => isPessoaManual(p.id))
+        setData({
+          ...postIAData,
+          pessoas: pessoasManuais
+        })
+        return
+      }
       // Se for PRODUTIVIDADE e deltaProdutividade for 0 ou não existir, será recalculado no useEffect de cálculos
       setData(postIAData)
       return
@@ -304,42 +314,57 @@ export const PostIATab = ({
     // Só re-herda se o tipo do baseline corresponde ao tipo atual
     if (baselineData.tipo === novoTipo) {
       if (baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData) {
-        // Garante que TODAS as pessoas do baseline sejam herdadas
+        // Só adiciona pessoas do baseline se pessoaEnvolvida for true
         setData(prevData => {
           // Se já tem dados no Pós-IA, preserva valores preenchidos
           const pessoasExistentes = prevData.tipo === 'PRODUTIVIDADE' && 'pessoas' in prevData ? prevData.pessoas : []
+          const pessoaEnvolvida = prevData.tipo === 'PRODUTIVIDADE' ? (prevData.pessoaEnvolvida ?? false) : false
+          
+          // Separar pessoas manuais das pessoas do baseline
+          const isPessoaManual = (id: string): boolean => id.startsWith('manual-')
+          const pessoasManuais = pessoasExistentes.filter(p => isPessoaManual(p.id))
+          const pessoasBaselineExistentes = pessoasExistentes.filter(p => !isPessoaManual(p.id))
 
-          // Mapeia TODAS as pessoas do baseline
-          const novasPessoas = baselineData.pessoas.map(p => {
-            const existente = pessoasExistentes.find(pp => pp.id === p.id)
-            // Se já existe no Pós-IA, preserva os valores preenchidos
-            if (existente) {
+          let novasPessoas: PostIAProdutividadePerson[] = []
+          
+          // Se pessoaEnvolvida é true, adiciona pessoas do baseline
+          if (pessoaEnvolvida) {
+            // Mapeia pessoas do baseline
+            const pessoasBaseline = baselineData.pessoas.map(p => {
+              const existente = pessoasBaselineExistentes.find(pp => pp.id === p.id)
+              // Se já existe no Pós-IA, preserva os valores preenchidos
+              if (existente) {
+                return {
+                  id: p.id,
+                  nome: p.nome,
+                  cargo: p.cargo,
+                  valorHora: existente.valorHora ?? p.valorHora,
+                  tempoGasto: existente.tempoGasto ?? p.tempoGasto,
+                  frequenciaReal: existente.frequenciaReal ?? { ...p.frequenciaReal },
+                  frequenciaDesejada: existente.frequenciaDesejada ?? { ...p.frequenciaDesejada }
+                }
+              }
+              // Se não existe, cria nova pessoa herdando do baseline
               return {
                 id: p.id,
                 nome: p.nome,
                 cargo: p.cargo,
-                valorHora: existente.valorHora ?? p.valorHora,
-                tempoGasto: existente.tempoGasto ?? p.tempoGasto,
-                frequenciaReal: existente.frequenciaReal ?? { ...p.frequenciaReal },
-                frequenciaDesejada: existente.frequenciaDesejada ?? { ...p.frequenciaDesejada }
+                valorHora: p.valorHora,
+                tempoGasto: p.tempoGasto,
+                frequenciaReal: { ...p.frequenciaReal },
+                frequenciaDesejada: { ...p.frequenciaDesejada }
               }
-            }
-            // Se não existe, cria nova pessoa herdando do baseline
-            return {
-              id: p.id,
-              nome: p.nome,
-              cargo: p.cargo,
-              valorHora: p.valorHora,
-              tempoGasto: p.tempoGasto,
-              frequenciaReal: { ...p.frequenciaReal },
-              frequenciaDesejada: { ...p.frequenciaDesejada }
-            }
-          })
+            })
+            novasPessoas = [...pessoasBaseline, ...pessoasManuais]
+          } else {
+            // Se pessoaEnvolvida é false, mantém apenas pessoas manuais
+            novasPessoas = pessoasManuais
+          }
 
           return {
             tipo: 'PRODUTIVIDADE',
-            pessoaEnvolvida: prevData.tipo === 'PRODUTIVIDADE' ? (prevData.pessoaEnvolvida ?? false) : false,
-            pessoas: novasPessoas, // Garante que todas as pessoas do baseline estão presentes
+            pessoaEnvolvida: pessoaEnvolvida,
+            pessoas: novasPessoas,
             custoTotalPostIA: prevData.tipo === 'PRODUTIVIDADE' ? prevData.custoTotalPostIA : 0,
             deltaProdutividade: prevData.tipo === 'PRODUTIVIDADE' ? prevData.deltaProdutividade : 0
           }
@@ -939,9 +964,36 @@ export const PostIATab = ({
                       name="pessoaEnvolvidaPostIA"
                       checked={data.pessoaEnvolvida === true}
                       onChange={() => {
+                        if (!baselineData || baselineData.tipo !== 'PRODUTIVIDADE' || !('pessoas' in baselineData)) {
+                          return
+                        }
+                        
+                        // Separar pessoas manuais das pessoas do baseline existentes
+                        const isPessoaManual = (id: string): boolean => id.startsWith('manual-')
+                        const pessoasManuais = data.pessoas.filter(p => isPessoaManual(p.id))
+                        const pessoasBaselineExistentes = data.pessoas.filter(p => !isPessoaManual(p.id))
+                        
+                        // Adiciona todas as pessoas do baseline que ainda não estão presentes
+                        const pessoasBaseline = baselineData.pessoas.map(p => {
+                          const existente = pessoasBaselineExistentes.find(pp => pp.id === p.id)
+                          if (existente) {
+                            return existente
+                          }
+                          return {
+                            id: p.id,
+                            nome: p.nome,
+                            cargo: p.cargo,
+                            valorHora: p.valorHora,
+                            tempoGasto: p.tempoGasto,
+                            frequenciaReal: { ...p.frequenciaReal },
+                            frequenciaDesejada: { ...p.frequenciaDesejada }
+                          }
+                        })
+                        
                         const updatedData: PostIAData = {
                           ...data,
-                          pessoaEnvolvida: true
+                          pessoaEnvolvida: true,
+                          pessoas: [...pessoasBaseline, ...pessoasManuais]
                         }
                         updateData(updatedData)
                       }}
