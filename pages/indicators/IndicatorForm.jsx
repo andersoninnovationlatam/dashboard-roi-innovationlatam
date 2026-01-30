@@ -128,30 +128,86 @@ const IndicatorForm = () => {
           setDataLoaded(true) // Marca como carregado mesmo com erro
         }
       } else if (!isEditing) {
-        // Se não está editando, reseta o formData
-        setFormData({
-          nome: '',
-          tipoIndicador: 'Produtividade',
-          descricao: '',
-          camposEspecificos: {},
-          baseline: {
-            pessoas: []
-          },
-          baselineData: null,
-          postIAData: null,
-          comIA: {
-            precisaValidacao: false,
-            pessoaEnvolvida: false,
-            pessoas: [],
-            ias: []
-          },
-          custos: []
-        })
+        // Se não está editando, carregar custos compartilhados do projeto
+        const loadSharedCosts = async () => {
+          try {
+            // Inicializar formData primeiro
+            setFormData({
+              nome: '',
+              tipoIndicador: 'Produtividade',
+              descricao: '',
+              camposEspecificos: {},
+              baseline: {
+                pessoas: []
+              },
+              baselineData: null,
+              postIAData: null,
+              comIA: {
+                precisaValidacao: false,
+                pessoaEnvolvida: false,
+                pessoas: [],
+                ias: []
+              },
+              custos: []
+            })
+
+            // Buscar custos compartilhados apenas se houver projectId
+            if (id) {
+              // Buscar todos os indicadores do projeto
+              const projectIndicators = await indicatorServiceSupabase.getByProjectId(id)
+              
+              // Consolidar custos de todos os indicadores do projeto
+              const allCosts = []
+              const costKeys = new Set() // Para evitar duplicatas
+              
+              for (const indicator of projectIndicators) {
+                try {
+                  const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicator.id)
+                  if (completeIndicator && completeIndicator.custos && Array.isArray(completeIndicator.custos)) {
+                    // Adicionar custos únicos (evitar duplicatas por nome/valor/tipo)
+                    completeIndicator.custos.forEach(custo => {
+                      if (custo.nome) {
+                        // Criar chave única baseada em nome, valor e tipo
+                        const custoKey = `${(custo.nome || '').toLowerCase().trim()}_${custo.valor || ''}_${custo.tipo || 'mensal'}`
+                        if (!costKeys.has(custoKey)) {
+                          costKeys.add(custoKey)
+                          allCosts.push({
+                            nome: custo.nome,
+                            valor: custo.valor || '',
+                            tipo: custo.tipo || 'mensal',
+                            categoria: custo.categoria,
+                            observacoes: custo.observacoes
+                          })
+                        }
+                      }
+                    })
+                  }
+                } catch (indicatorError) {
+                  console.warn(`Erro ao carregar custos do indicador ${indicator.id}:`, indicatorError)
+                  // Continua para o próximo indicador
+                }
+              }
+              
+              // Atualizar formData com custos compartilhados
+              if (allCosts.length > 0) {
+                setFormData(prev => ({
+                  ...prev,
+                  custos: allCosts
+                }))
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao carregar custos compartilhados:', error)
+            // Não bloquear criação do indicador se falhar ao carregar custos
+          }
+        }
+        
+        loadSharedCosts()
       }
     }
 
     loadIndicatorData()
-  }, [indicatorId, isEditing])
+  }, [indicatorId, isEditing, id])
 
   // Reseta dataLoaded quando indicatorId muda
   useEffect(() => {

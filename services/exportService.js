@@ -18,13 +18,13 @@ import { supabase } from '../src/lib/supabase'
 function calcularHorasPorMes(quantidade, periodo) {
   const qtd = Number(quantidade) || 0
   if (qtd === 0) return 0
-  
+
   const multiplicadores = {
     'Diário': 30,
     'Semanal': 4.33,
     'Mensal': 1
   }
-  
+
   return qtd * (multiplicadores[periodo] || 1)
 }
 
@@ -33,15 +33,15 @@ function calcularHorasPorMes(quantidade, periodo) {
  */
 function calcularCustoPessoa(pessoa) {
   if (!pessoa) return 0
-  
+
   const tempoGasto = Number(pessoa.tempoGasto) || 0 // em minutos
   const valorHora = Number(pessoa.valorHora) || 0
   const quantidade = Number(pessoa.frequenciaReal?.quantidade) || 0
   const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
-  
+
   const horasPorMes = calcularHorasPorMes(quantidade, periodo)
   const horasGastas = (tempoGasto / 60) * horasPorMes
-  
+
   return horasGastas * valorHora
 }
 
@@ -54,12 +54,12 @@ function extractIndicatorData(indicator) {
     tipoIndicador: indicator.tipoIndicador || '',
     descricao: indicator.description || indicator.descricao || ''
   }
-  
+
   const baseline = indicator.baselineData || {}
   const postIA = indicator.postIAData || {}
   const custos = Array.isArray(indicator.custos) ? indicator.custos : []
   const ia = indicator.ia || {}
-  
+
   return { info, baseline, postIA, custos, ia }
 }
 
@@ -68,7 +68,7 @@ function extractIndicatorData(indicator) {
  */
 function formatProdutividadeBaseline(baseline) {
   if (!baseline.pessoas || baseline.pessoas.length === 0) return null
-  
+
   return baseline.pessoas.map(p => ({
     nome: p.nome || '',
     cargo: p.cargo || '',
@@ -85,7 +85,7 @@ function formatProdutividadeBaseline(baseline) {
  */
 function formatProdutividadePostIA(postIA) {
   if (!postIA.pessoas || postIA.pessoas.length === 0) return null
-  
+
   return {
     pessoas: postIA.pessoas.map(p => ({
       nome: p.nome || '',
@@ -124,7 +124,7 @@ function formatIncrementoReceitaPostIA(postIA) {
  */
 function formatCustosRelacionadosBaseline(baseline) {
   if (!baseline.ferramentas || baseline.ferramentas.length === 0) return null
-  
+
   return baseline.ferramentas.map(f => ({
     nomeFerramenta: f.nomeFerramenta || '',
     custoMensal: Number(f.custoMensal) || 0,
@@ -137,7 +137,7 @@ function formatCustosRelacionadosBaseline(baseline) {
  */
 function formatCustosRelacionadosPostIA(postIA) {
   if (!postIA.ferramentas || postIA.ferramentas.length === 0) return null
-  
+
   return postIA.ferramentas.map(f => ({
     nomeFerramenta: f.nomeFerramenta || '',
     custoMensal: Number(f.custoMensal) || 0,
@@ -187,12 +187,12 @@ export const exportService = {
 
       // 3. Buscar indicadores
       const indicators = await indicatorServiceSupabase.getByProjectId(projectId, user.id)
-      const validIndicators = indicators.filter(ind => 
+      const validIndicators = indicators.filter(ind =>
         indicatorServiceSupabase.isValidUUID(ind.id)
       )
-      
+
       const completeIndicators = await Promise.all(
-        validIndicators.map(async ind => 
+        validIndicators.map(async ind =>
           await indicatorServiceSupabase.getCompleteById(ind.id)
         )
       )
@@ -558,12 +558,12 @@ export const exportService = {
 
       // 3. Buscar indicadores
       const indicators = await indicatorServiceSupabase.getByProjectId(projectId, user.id)
-      const validIndicators = indicators.filter(ind => 
+      const validIndicators = indicators.filter(ind =>
         indicatorServiceSupabase.isValidUUID(ind.id)
       )
-      
+
       const completeIndicators = await Promise.all(
-        validIndicators.map(async ind => 
+        validIndicators.map(async ind =>
           await indicatorServiceSupabase.getCompleteById(ind.id)
         )
       )
