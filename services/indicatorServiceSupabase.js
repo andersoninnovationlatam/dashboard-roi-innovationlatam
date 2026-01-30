@@ -297,7 +297,6 @@ export const indicatorServiceSupabase = {
             m.metric_name === 'Receita Antes' || 
             m.metric_name?.toLowerCase().includes('receita')
           )
-          console.log('🔍 getCompleteById - INCREMENTO RECEITA - receitaMetric:', receitaMetric, 'customMetrics:', customMetrics)
           baselineData = {
             ...baselineData,
             valorReceitaAntes: receitaMetric?.baseline_value || 0
@@ -429,7 +428,10 @@ export const indicatorServiceSupabase = {
         case 'PRODUTIVIDADE':
           postIAData = {
             ...postIAData,
-            pessoas: pessoasPostIAComFrequencia
+            pessoaEnvolvida: false,
+            pessoas: pessoasPostIAComFrequencia,
+            custoTotalPostIA: 0, // Será calculado pelo componente
+            deltaProdutividade: 0 // Será calculado pelo componente
           }
           break
         case 'INCREMENTO RECEITA':
@@ -437,7 +439,6 @@ export const indicatorServiceSupabase = {
             m.metric_name === 'Receita Antes' || 
             m.metric_name?.toLowerCase().includes('receita')
           )
-          console.log('🔍 getCompleteById - INCREMENTO RECEITA (PostIA) - receitaPostIAMetric:', receitaPostIAMetric)
           postIAData = {
             ...postIAData,
             valorReceitaDepois: receitaPostIAMetric?.post_ia_value || 0
@@ -450,15 +451,6 @@ export const indicatorServiceSupabase = {
             pessoas: pessoasPostIAComFrequencia
           }
       }
-
-      // Debug: Log para verificar dados transformados
-      console.log('🔍 getCompleteById - Dados transformados:', {
-        baselineType,
-        pessoasBaselineCount: pessoasBaselineComFrequencia.length,
-        pessoasPostIACount: pessoasPostIAComFrequencia.length,
-        baselineData,
-        postIAData
-      })
 
       // Criar info_data no formato legado para compatibilidade com formulário
       const improvementTypeToLegacyType = {
@@ -481,12 +473,6 @@ export const indicatorServiceSupabase = {
         descricao: indicator.description || '',
         camposEspecificos: {} // Pode ser expandido se necessário
       }
-
-      console.log('🔍 getCompleteById - info_data criado:', {
-        improvement_type: indicator.improvement_type,
-        tipoIndicadorLegado,
-        infoDataLegado
-      })
 
       const { iaData, custosData } = this._transformToolsToLegacy(toolsBaseline, toolsPostIA)
 

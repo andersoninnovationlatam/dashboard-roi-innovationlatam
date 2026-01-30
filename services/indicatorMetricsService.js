@@ -961,18 +961,6 @@ export const calcularMetricasPorTipo = (indicators) => {
     }
   })
 
-  console.log('📈 Resultado calcularMetricasPorTipo:', {
-    totalIndicadores: indicators.length,
-    produtividade: metricasProdutividade.length,
-    capacidadeAnalitica: metricasCapacidadeAnalitica.length,
-    incrementoReceita: metricasIncrementoReceita.length,
-    melhoriaMargem: metricasMelhoriaMargem.length,
-    reducaoRisco: metricasReducaoRisco.length,
-    qualidadeDecisao: metricasQualidadeDecisao.length,
-    velocidade: metricasVelocidade.length,
-    satisfacao: metricasSatisfacao.length
-  })
-
   return {
     produtividade: metricasProdutividade,
     capacidadeAnalitica: metricasCapacidadeAnalitica,
