@@ -61,15 +61,6 @@ const IndicatorForm = () => {
           const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
 
           if (completeIndicator) {
-            // Debug: Log para verificar dados recebidos
-            console.log('🔍 IndicatorForm - Dados recebidos do getCompleteById:', {
-              completeIndicator,
-              baselineData: completeIndicator.baselineData,
-              postIAData: completeIndicator.postIAData,
-              personsBaseline: completeIndicator.persons_baseline,
-              personsPostIA: completeIndicator.persons_post_ia
-            })
-
             // Carrega dados do Supabase suportando formato normalizado e antigo
             const nome = completeIndicator.name || completeIndicator.nome
             const tipoIndicador = normalizarTipoIndicador(completeIndicator) || completeIndicator.tipoIndicador
@@ -93,12 +84,6 @@ const IndicatorForm = () => {
               ...pessoa,
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
             }))
-
-            console.log('🔍 IndicatorForm - Dados processados:', {
-              pessoasBaselineCount: pessoasBaseline.length,
-              baselineData: completeIndicator.baselineData,
-              postIAData: completeIndicator.postIAData
-            })
 
             setFormData({
               nome: infoData?.nome || '',
@@ -628,17 +613,30 @@ const IndicatorForm = () => {
               <div>
                 <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
                   Tipo de Indicador <span className="text-red-500">*</span>
+                  {isEditing && (
+                    <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">
+                      (Não pode ser alterado após criação)
+                    </span>
+                  )}
                 </label>
                 <select
                   value={formData.tipoIndicador}
                   onChange={(e) => handleTipoIndicadorChange(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  disabled={isEditing}
+                  className={`w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isEditing ? 'opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-700' : ''
+                    }`}
                   required
+                  title={isEditing ? 'O tipo de indicador não pode ser alterado após a criação' : ''}
                 >
                   {TIPOS_INDICADOR.map(tipo => (
                     <option key={tipo} value={tipo}>{tipo}</option>
                   ))}
                 </select>
+                {isEditing && (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    O tipo de indicador está bloqueado para preservar os dados já salvos.
+                  </p>
+                )}
               </div>
 
               <Input

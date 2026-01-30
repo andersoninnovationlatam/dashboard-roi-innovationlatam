@@ -120,36 +120,11 @@ export const AuthProvider = ({ children }) => {
             fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:120',message:'onAuthStateChange SIGNED_IN - BEFORE setUser',data:{userId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
             // #endregion
             
-            // CORREÇÃO: Buscar dados completos do usuário e atualizar
-            if (newUser?.id) {
-              userServiceSupabase.getById(newUser.id)
-                .then(userRecord => {
-                  if (userRecord) {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:128',message:'onAuthStateChange SIGNED_IN - getById SUCCESS',data:{userId:newUser.id,organizationId:userRecord?.organization_id,role:userRecord?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                    // #endregion
-                    
-                    // Atualiza usuário com dados completos
-                    setUser({
-                      ...newUser,
-                      organization_id: userRecord.organization_id,
-                      role: userRecord.role
-                    })
-                  } else {
-                    // Se não encontrou, usa dados básicos
-                    setUser(newUser)
-                  }
-                })
-                .catch(error => {
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:140',message:'onAuthStateChange SIGNED_IN - getById ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                  // #endregion
-                  // Usa dados básicos mesmo se getById falhar
-                  setUser(newUser)
-                })
-            } else {
-              setUser(newUser)
-            }
+            // CORREÇÃO CRÍTICA: O callback do authServiceSupabase.onAuthStateChange já retorna
+            // dados completos do usuário (incluindo organization_id e role) após chamar getById().
+            // Não precisamos buscar novamente aqui - isso causa chamadas duplicadas, timeouts
+            // e re-renders desnecessários que podem causar atualização automática da tela.
+            setUser(newUser)
             
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:148',message:'onAuthStateChange SIGNED_IN - AFTER setUser',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
