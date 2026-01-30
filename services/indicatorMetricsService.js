@@ -389,17 +389,7 @@ export const calcularMetricasReducaoRisco = (indicador) => {
   const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Redução de Risco' ? 'REDUÇÃO DE RISCO' : tipoIndicador
   
-  console.log('🔍 Debug Redução de Risco:', {
-    nome: obterNomeIndicador(indicador),
-    tipoIndicador,
-    tipoMapeado,
-    improvement_type: indicador.improvement_type,
-    baselineTipo: baselineData.tipo,
-    postIATipo: postIAData.tipo
-  })
-  
   if (tipoMapeado !== 'REDUÇÃO DE RISCO' && baselineData.tipo !== 'REDUÇÃO DE RISCO' && postIAData.tipo !== 'REDUÇÃO DE RISCO') {
-    console.log('❌ Indicador não é do tipo Redução de Risco')
     return null
   }
 
@@ -469,16 +459,6 @@ export const calcularMetricasReducaoRisco = (indicador) => {
     custoImplementacao          // R$ investido
   }
 
-  console.log('✅ Métricas Redução de Risco calculadas:', {
-    nome: resultado.nome,
-    reducaoProbabilidade: resultado.reducaoProbabilidade,
-    valorRiscoEvitado: resultado.valorRiscoEvitado,
-    economiaMitigacao: resultado.economiaMitigacao,
-    beneficioAnual: resultado.beneficioAnual,
-    custoVsBeneficio: resultado.custoVsBeneficio,
-    roiReducaoRisco: resultado.roiReducaoRisco
-  })
-
   return resultado
 }
 
@@ -495,17 +475,7 @@ export const calcularMetricasQualidadeDecisao = (indicador) => {
   const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Qualidade Decisão' ? 'QUALIDADE DECISÃO' : tipoIndicador
   
-  console.log('🔍 Debug Qualidade Decisão:', {
-    nome: obterNomeIndicador(indicador),
-    tipoIndicador,
-    tipoMapeado,
-    improvement_type: indicador.improvement_type,
-    baselineTipo: baselineData.tipo,
-    postIATipo: postIAData.tipo
-  })
-  
   if (tipoMapeado !== 'QUALIDADE DECISÃO' && baselineData.tipo !== 'QUALIDADE DECISÃO' && postIAData.tipo !== 'QUALIDADE DECISÃO') {
-    console.log('❌ Indicador não é do tipo Qualidade Decisão')
     return null
   }
 
@@ -598,16 +568,6 @@ export const calcularMetricasQualidadeDecisao = (indicador) => {
     custoImplementacao          // R$ investido
   }
 
-  console.log('✅ Métricas Qualidade Decisão calculadas:', {
-    nome: resultado.nome,
-    melhoriaTaxaAcerto: resultado.melhoriaTaxaAcerto,
-    economiaErrosEvitados: resultado.economiaErrosEvitados,
-    economiaTempo: resultado.economiaTempo,
-    valorTempoEconomizado: resultado.valorTempoEconomizado,
-    beneficioTotalMensal: resultado.beneficioTotalMensal,
-    roiMelhoria: resultado.roiMelhoria
-  })
-
   return resultado
 }
 
@@ -624,17 +584,7 @@ export const calcularMetricasVelocidade = (indicador) => {
   const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Velocidade' ? 'VELOCIDADE' : tipoIndicador
   
-  console.log('🔍 Debug Velocidade:', {
-    nome: obterNomeIndicador(indicador),
-    tipoIndicador,
-    tipoMapeado,
-    improvement_type: indicador.improvement_type,
-    baselineTipo: baselineData.tipo,
-    postIATipo: postIAData.tipo
-  })
-  
   if (tipoMapeado !== 'VELOCIDADE' && baselineData.tipo !== 'VELOCIDADE' && postIAData.tipo !== 'VELOCIDADE') {
-    console.log('❌ Indicador não é do tipo Velocidade')
     return null
   }
 
@@ -736,16 +686,6 @@ export const calcularMetricasVelocidade = (indicador) => {
     custoImplementacao
   }
 
-  console.log('✅ Métricas Velocidade calculadas:', {
-    nome: resultado.nome,
-    reducaoTempoEntrega: resultado.reducaoTempoEntrega.toFixed(2) + '%',
-    aumentoCapacidade: resultado.aumentoCapacidade.toFixed(0),
-    economiaAtrasos: 'R$ ' + resultado.economiaAtrasos.toFixed(2),
-    valorTempoEconomizado: 'R$ ' + resultado.valorTempoEconomizado.toFixed(2),
-    ganhoProdutividade: resultado.ganhoProdutividade.toFixed(2) + '%',
-    roiVelocidade: resultado.roiVelocidade.toFixed(2) + '%'
-  })
-
   return resultado
 }
 
@@ -762,17 +702,7 @@ export const calcularMetricasSatisfacao = (indicador) => {
   const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Satisfação' ? 'SATISFAÇÃO' : tipoIndicador
   
-  console.log('🔍 Debug Satisfação:', {
-    nome: obterNomeIndicador(indicador),
-    tipoIndicador,
-    tipoMapeado,
-    improvement_type: indicador.improvement_type,
-    baselineTipo: baselineData.tipo,
-    postIATipo: postIAData.tipo
-  })
-  
   if (tipoMapeado !== 'SATISFAÇÃO' && baselineData.tipo !== 'SATISFAÇÃO' && postIAData.tipo !== 'SATISFAÇÃO') {
-    console.log('❌ Indicador não é do tipo Satisfação')
     return null
   }
 
@@ -862,17 +792,6 @@ export const calcularMetricasSatisfacao = (indicador) => {
     custoImplementacao
   }
 
-  console.log('✅ Métricas Satisfação calculadas:', {
-    nome: resultado.nome,
-    deltaSatisfacao: resultado.deltaSatisfacao.toFixed(1) + ' pontos',
-    reducaoChurn: resultado.reducaoChurn.toFixed(2) + '%',
-    valorRetencao: 'R$ ' + resultado.valorRetencao.toFixed(2),
-    economiaSuporte: 'R$ ' + resultado.economiaSuporte.toFixed(2),
-    aumentoRevenue: 'R$ ' + resultado.aumentoRevenue.toFixed(2),
-    ltvIncrementado: 'R$ ' + resultado.ltvIncrementado.toFixed(2),
-    roiSatisfacao: resultado.roiSatisfacao.toFixed(2) + '%'
-  })
-
   return resultado
 }
 
@@ -935,7 +854,6 @@ export const calcularMetricasPorTipo = (indicators) => {
     const metricasRisco = calcularMetricasReducaoRisco(indicador)
     if (metricasRisco) {
       metricasReducaoRisco.push(metricasRisco)
-      console.log('📊 Métrica de Redução de Risco adicionada ao array')
       return
     }
 
