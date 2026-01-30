@@ -73,72 +73,13 @@ export const userServiceSupabase = {
       return pendingQueries.get(id)
     }
 
-    // #region agent log
-    // Usa requestIdleCallback para não bloquear a UI e envolve em try/catch para evitar erros de extensões
-    try {
-      const logFn = () => {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 500)
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ location: 'userServiceSupabase.js:66', message: 'getById() ENTRY', data: { userId: id, isConfigured: !!isSupabaseConfigured, hasSupabase: !!supabase }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-          signal: controller.signal
-        }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-      }
-      if (typeof window !== 'undefined' && window.requestIdleCallback) {
-        window.requestIdleCallback(logFn, { timeout: 100 })
-      } else {
-        setTimeout(logFn, 0)
-      }
-    } catch { }
-    // #endregion
-
     if (!isSupabaseConfigured || !supabase) {
-      // #region agent log
-      try {
-        const logFn = () => {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 500)
-          fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ location: 'userServiceSupabase.js:68', message: 'getById() ERROR - Não configurado', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-            signal: controller.signal
-          }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-        }
-        if (typeof window !== 'undefined' && window.requestIdleCallback) {
-          window.requestIdleCallback(logFn, { timeout: 100 })
-        } else {
-          setTimeout(logFn, 0)
-        }
-      } catch { }
-      // #endregion
       return null
     }
 
     // Cria promise para a query
     const queryPromise = (async () => {
       try {
-        // #region agent log
-        try {
-          const logFn = () => {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 500)
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ location: 'userServiceSupabase.js:72', message: 'getById() BEFORE query', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-              signal: controller.signal
-            }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-          }
-          if (typeof window !== 'undefined' && window.requestIdleCallback) {
-            window.requestIdleCallback(logFn, { timeout: 100 })
-          } else {
-            setTimeout(logFn, 0)
-          }
-        } catch { }
-        // #endregion
 
         let queryResult = null
         let queryError = null
@@ -158,49 +99,10 @@ export const userServiceSupabase = {
           queryResult = await Promise.race([queryPromise, timeoutPromise])
           queryError = queryResult.error
         } catch (catchError) {
-          // #region agent log
-          try {
-            const logFn = () => {
-              const controller = new AbortController()
-              const timeoutId = setTimeout(() => controller.abort(), 500)
-              fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ location: 'userServiceSupabase.js:90', message: 'getById() query CATCH', data: { errorMessage: catchError?.message, errorStack: catchError?.stack?.substring(0, 200), isTimeout: catchError?.message?.includes('Timeout') }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-                signal: controller.signal
-              }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-            }
-            if (typeof window !== 'undefined' && window.requestIdleCallback) {
-              window.requestIdleCallback(logFn, { timeout: 100 })
-            } else {
-              setTimeout(logFn, 0)
-            }
-          } catch { }
-          // #endregion
           queryError = catchError
         }
 
         const { data, error } = queryResult || { data: null, error: queryError }
-
-        // #region agent log
-        try {
-          const logFn = () => {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 500)
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ location: 'userServiceSupabase.js:90', message: 'getById() AFTER query', data: { hasError: !!error, errorMessage: error?.message, errorCode: error?.code, errorStatus: error?.status, hasData: !!data, organizationId: data?.organization_id, role: data?.role }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-              signal: controller.signal
-            }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-          }
-          if (typeof window !== 'undefined' && window.requestIdleCallback) {
-            window.requestIdleCallback(logFn, { timeout: 100 })
-          } else {
-            setTimeout(logFn, 0)
-          }
-        } catch { }
-        // #endregion
 
         // Remove da cache quando completa (sucesso ou erro)
         pendingQueries.delete(id)
@@ -217,26 +119,6 @@ export const userServiceSupabase = {
       } catch (error) {
         // Remove da cache em caso de erro não tratado
         pendingQueries.delete(id)
-
-        // #region agent log
-        try {
-          const logFn = () => {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 500)
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ location: 'userServiceSupabase.js:87', message: 'getById() CATCH ERROR', data: { errorMessage: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }),
-              signal: controller.signal
-            }).catch(() => { }).finally(() => clearTimeout(timeoutId))
-          }
-          if (typeof window !== 'undefined' && window.requestIdleCallback) {
-            window.requestIdleCallback(logFn, { timeout: 100 })
-          } else {
-            setTimeout(logFn, 0)
-          }
-        } catch { }
-        // #endregion
         console.error('Erro ao buscar usuário:', error)
         return null
       }

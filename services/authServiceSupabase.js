@@ -59,14 +59,8 @@ export const authServiceSupabase = {
    * Faz login do usuário no Supabase
    */
   async login(email, senha) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:61',message:'login() ENTRY',data:{email:email?.substring(0,10)+'...',hasPassword:!!senha},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     
     if (!isSupabaseConfigured) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:63',message:'login() ERROR - Supabase não configurado',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return { 
         success: false, 
         error: 'Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env' 
@@ -74,9 +68,6 @@ export const authServiceSupabase = {
     }
 
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:70',message:'login() BEFORE signInWithPassword',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       
       let signInResult = null
       let signInError = null
@@ -95,17 +86,10 @@ export const authServiceSupabase = {
         signInResult = await Promise.race([signInPromise, timeoutPromise])
         signInError = signInResult.error
       } catch (catchError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:85',message:'login() signInWithPassword CATCH',data:{errorMessage:catchError?.message,errorStack:catchError?.stack?.substring(0,200),isTimeout:catchError?.message?.includes('Timeout')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         signInError = catchError
       }
       
       const { data, error } = signInResult || { data: null, error: signInError }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:104',message:'login() AFTER signInWithPassword',data:{hasError:!!error,errorMessage:error?.message,errorCode:error?.status,hasUser:!!data?.user,userId:data?.user?.id,hasData:!!data,hasSignInResult:!!signInResult},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       if (error) {
         // Tratamento específico para email não confirmado
@@ -137,9 +121,6 @@ export const authServiceSupabase = {
       }
 
       if (data.user) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:120',message:'login() USER AUTHENTICATED - Returning immediately',data:{userId:data.user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         
         // CORREÇÃO CRÍTICA: Retorna sucesso imediatamente após autenticação
         // getById() será buscado assincronamente pelo AuthContext via onAuthStateChange
@@ -158,35 +139,18 @@ export const authServiceSupabase = {
             if (userRecord) {
               // Atualizar último login apenas se conseguiu buscar
               userServiceSupabase.updateLastLogin(data.user.id).catch(() => {})
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:135',message:'login() BACKGROUND getById SUCCESS',data:{userId:data.user.id,organizationId:userRecord?.organization_id,role:userRecord?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-              // #endregion
             }
           })
           .catch(error => {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:140',message:'login() BACKGROUND getById ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             // Não é crítico - login já foi bem-sucedido
             console.warn('Não foi possível buscar dados completos do usuário em background:', error.message)
           })
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:145',message:'login() RETURN SUCCESS IMMEDIATELY',data:{userId:userData.id,email:userData.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
 
         return { success: true, user: userData }
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:136',message:'login() RETURN NO USER',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       return { success: false, error: 'Erro ao fazer login' }
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:138',message:'login() CATCH ERROR',data:{errorMessage:error?.message,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return { success: false, error: error.message || 'Erro ao fazer login' }
     }
   },

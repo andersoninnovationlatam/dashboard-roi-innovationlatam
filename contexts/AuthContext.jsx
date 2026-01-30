@@ -100,9 +100,6 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = authServiceSupabase.onAuthStateChange((newUser, event) => {
         try {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:100',message:'onAuthStateChange EVENT',data:{event:event,hasNewUser:!!newUser,newUserId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           
           // CORREÇÃO: Não atualiza INITIAL_SESSION se já temos usuário com mesmo ID
           if (event === 'INITIAL_SESSION') {
@@ -116,19 +113,12 @@ export const AuthProvider = ({ children }) => {
           if (event === 'SIGNED_OUT') {
             setUser(null)
           } else if (event === 'SIGNED_IN') {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:120',message:'onAuthStateChange SIGNED_IN - BEFORE setUser',data:{userId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             
             // CORREÇÃO CRÍTICA: O callback do authServiceSupabase.onAuthStateChange já retorna
             // dados completos do usuário (incluindo organization_id e role) após chamar getById().
             // Não precisamos buscar novamente aqui - isso causa chamadas duplicadas, timeouts
             // e re-renders desnecessários que podem causar atualização automática da tela.
             setUser(newUser)
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:148',message:'onAuthStateChange SIGNED_IN - AFTER setUser',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
           } else if (event === 'TOKEN_REFRESHED') {
             // CORREÇÃO CRÍTICA: Ignora completamente TOKEN_REFRESHED - apenas token mudou
             // O callback já retorna dados básicos sem getById(), então não precisamos atualizar estado
@@ -203,40 +193,19 @@ export const AuthProvider = ({ children }) => {
   }, []) // Executa apenas uma vez na montagem - onAuthStateChange cuida das atualizações
 
   const login = async (email, senha) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:187',message:'AuthContext.login() ENTRY',data:{email:email?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     
     try {
       const result = await authServiceSupabase.login(email, senha)
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:190',message:'AuthContext.login() RESULT',data:{success:result?.success,hasUser:!!result?.user,userId:result?.user?.id,error:result?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      
       if (result.success) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:191',message:'AuthContext.login() BEFORE setUser',data:{userId:result.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         
         setUser(result.user)
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:192',message:'AuthContext.login() AFTER setUser - RETURN SUCCESS',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         
         return { success: true }
       }
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:194',message:'AuthContext.login() RETURN ERROR',data:{error:result?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      
       return result
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:196',message:'AuthContext.login() CATCH ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return { success: false, error: error.message || 'Erro ao fazer login' }
     }
   }

@@ -1,10 +1,28 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 
 const Tabs = ({ tabs, defaultTab = 0, children, onChange }) => {
   const [activeTab, setActiveTab] = useState(defaultTab)
+  const isInitialMount = useRef(true)
+  const lastDefaultTab = useRef(defaultTab)
+
+  // Atualizar quando defaultTab mudar externamente (mas não resetar em re-renders)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      lastDefaultTab.current = defaultTab
+      return
+    }
+    
+    // Só atualiza se defaultTab realmente mudou (não é apenas um re-render)
+    if (defaultTab !== lastDefaultTab.current) {
+      setActiveTab(defaultTab)
+      lastDefaultTab.current = defaultTab
+    }
+  }, [defaultTab])
 
   const handleTabChange = (index) => {
     setActiveTab(index)
+    lastDefaultTab.current = index
     if (onChange) {
       onChange(index)
     }

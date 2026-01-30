@@ -60,6 +60,7 @@ const IndicatorForm = () => {
   const [loading, setLoading] = useState(false)
   const [forceUpdate, setForceUpdate] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState(0) // Estado para controlar qual aba está ativa
 
   useEffect(() => {
     // Evita recarregar dados se já foram carregados para este indicador
@@ -641,7 +642,11 @@ const IndicatorForm = () => {
           </div>
         )}
 
-        <Tabs tabs={tabs}>
+        <Tabs 
+          tabs={tabs} 
+          defaultTab={activeTab}
+          onChange={(index) => setActiveTab(index)}
+        >
           {/* Tab 1: Info */}
           <Card>
             <div className="space-y-6">

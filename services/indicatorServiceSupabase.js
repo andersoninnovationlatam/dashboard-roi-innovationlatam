@@ -223,8 +223,12 @@ export const indicatorServiceSupabase = {
         customMetricService.getByIndicatorId(id),
         calculatedResultsService.getLatestByIndicatorId(id),
         trackingService.getByIndicatorId(id),
-        supabase.from('indicator_type_specific_data').select('*').eq('indicator_id', id).single().then(({ data, error }) => {
-          if (error && error.code !== 'PGRST116') {
+        supabase.from('indicator_type_specific_data').select('*').eq('indicator_id', id).maybeSingle().then(({ data, error }) => {
+          // maybeSingle() retorna null quando não há registro (ao invés de erro)
+          // Trata erros 406 (Not Acceptable) que podem ocorrer com RLS
+          if (error && error.code !== 'PGRST116' && error.code !== 'PGRST301') {
+            // PGRST116 = nenhum registro encontrado (ok com maybeSingle)
+            // PGRST301 = múltiplos registros (não deveria acontecer, mas trata)
             console.error('Erro ao buscar dados específicos:', error)
           }
           return data || null
