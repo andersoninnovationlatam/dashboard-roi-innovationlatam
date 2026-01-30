@@ -4,7 +4,8 @@
  */
 
 // Flag para desabilitar logs em produção ou quando necessário
-const DEBUG_LOGS_ENABLED = import.meta.env.DEV || false
+// DESABILITADO: Servidor de debug não está disponível, causando erros ERR_CONNECTION_REFUSED
+const DEBUG_LOGS_ENABLED = false
 
 // Cache de AbortControllers para cancelar requisições antigas se necessário
 const activeRequests = new Map()

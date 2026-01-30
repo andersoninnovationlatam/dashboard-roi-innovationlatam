@@ -101,17 +101,10 @@ export const DataProvider = ({ children }) => {
     // Primeira carga
     loadData()
 
-    // OTIMIZAÇÃO: Revalida a cada 60 segundos (reduzido de 30s para melhor performance)
-    // E apenas se a aba do navegador estiver ativa
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        loadData()
-      }
-    }, 60000) // 60 segundos
-
-    return () => {
-      clearInterval(intervalId)
-    }
+    // REMOVIDO: Refresh automático não é mais necessário
+    // Com dados normalizados nas colunas, não há necessidade de polling constante
+    // Se precisar de atualizações em tempo real, usar Supabase Realtime subscriptions
+    // O refresh automático causava re-renders desnecessários que resetavam o estado dos formulários
   }, [user?.id, loadData])
 
   const createProject = async (data) => {
