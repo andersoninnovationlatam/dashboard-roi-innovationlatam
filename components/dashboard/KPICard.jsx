@@ -12,13 +12,13 @@ import Card from '../common/Card'
  * @param {string} subLabel - Rótulo secundário opcional (ex: "/ano")
  * @param {boolean} isPositive - Se true, usa cor positiva; se false, usa vermelho (para valores negativos)
  */
-const KPICard = ({ 
-  label, 
-  value, 
-  icon, 
+const KPICard = ({
+  label,
+  value,
+  icon,
   color = 'blue',
   subLabel,
-  isPositive = true 
+  isPositive = true
 }) => {
   const colorClasses = {
     green: {
@@ -64,9 +64,9 @@ const KPICard = ({
       iconColor: 'text-yellow-600 dark:text-yellow-400'
     }
   }
-  
+
   const colors = colorClasses[color] || colorClasses.blue
-  
+
   return (
     <Card className={`bg-gradient-to-br ${colors.bg} ${colors.border} overflow-hidden h-full`}>
       <div className="flex items-center justify-between gap-3 min-w-0 h-full">
@@ -75,7 +75,7 @@ const KPICard = ({
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-1 truncate">
             {label}
           </p>
-          <p className={`text-2xl lg:text-3xl font-bold ${colors.text} break-words leading-tight`}>
+          <p className={`text-lg sm:text-sm xl:text-lg font-bold ${colors.text} break-words leading-tight`}>
             {value}
           </p>
           {subLabel && (
@@ -84,7 +84,7 @@ const KPICard = ({
             </p>
           )}
         </div>
-        
+
         {/* Ícone - flex-shrink-0 para não encolher */}
         <div className={`w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 ${colors.iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
           <i className={`${icon} text-lg sm:text-xl lg:text-3xl ${colors.iconColor}`}></i>
