@@ -12,6 +12,8 @@ import IAForm from '../../components/indicators/IAForm'
 import CustoForm from '../../components/indicators/CustoForm'
 import { BaselineTab } from '../../src/features/projects/BaselineTab'
 import { PostIATab } from '../../src/features/projects/PostIATab'
+import { getIndicatorComponent, hasSpecificComponent } from '../../src/components/indicators/indicatorComponents'
+import { calculateAndSaveIndicatorMetrics } from '../../services/calculations/indicatorCalculations'
 import { TIPOS_INDICADOR, CAMPOS_POR_TIPO } from '../../config/indicatorTypes'
 import { normalizarTipoIndicador } from '../../utils/indicatorUtils'
 
@@ -462,6 +464,9 @@ const IndicatorForm = () => {
       if (custo.tipo === 'anual') {
         return total + (valor / 12) // Converte anual para mensal para comparação
       }
+      if (custo.tipo === 'unico') {
+        return total + valor // Custo único não precisa de conversão
+      }
       return total + valor
     }, 0)
   }
@@ -472,6 +477,9 @@ const IndicatorForm = () => {
       const valor = parseFloat(custo.valor) || 0
       if (custo.tipo === 'mensal') {
         return total + (valor * 12) // Converte mensal para anual
+      }
+      if (custo.tipo === 'unico') {
+        return total + valor // Custo único não precisa de conversão
       }
       return total + valor
     }, 0)
@@ -596,6 +604,21 @@ const IndicatorForm = () => {
         }
       }
 
+      // Calcular e salvar métricas se houver serviço de cálculo disponível
+      if (indicatorIdToUse && baselineDataToSave && postIADataToSave) {
+        try {
+          await calculateAndSaveIndicatorMetrics(
+            formData.tipoIndicador,
+            indicatorIdToUse,
+            baselineDataToSave,
+            postIADataToSave
+          )
+        } catch (calcError) {
+          console.error('Erro ao calcular métricas:', calcError)
+          // Não bloquear o salvamento se o cálculo falhar
+        }
+      }
+
       navigate(`/projects/${id}/indicators`)
     } catch (error) {
       console.error('Erro ao salvar indicador:', error)
@@ -713,17 +736,41 @@ const IndicatorForm = () => {
                 </div>
               </div>
 
-              {/* Componente BaselineTab com seletor de tipo e campos dinâmicos */}
-              <BaselineTab
-                tipoIndicador={formData.tipoIndicador}
-                baselineData={formData.baselineData}
-                onBaselineChange={(baselineData) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    baselineData
-                  }))
-                }}
-              />
+              {/* Usar componente específico se disponível, ou BaselineTab genérico para outros */}
+              {hasSpecificComponent(formData.tipoIndicador) && indicatorId ? (() => {
+                const SpecificComponent = getIndicatorComponent(formData.tipoIndicador)
+                return (
+                  <SpecificComponent
+                    indicatorId={indicatorId}
+                    baselineData={formData.baselineData}
+                    postIAData={formData.postIAData}
+                    mode="baseline"
+                    onBaselineChange={(baselineData) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        baselineData
+                      }))
+                    }}
+                    onPostIAChange={(postIAData) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        postIAData
+                      }))
+                    }}
+                  />
+                )
+              })() : (
+                <BaselineTab
+                  tipoIndicador={formData.tipoIndicador}
+                  baselineData={formData.baselineData}
+                  onBaselineChange={(baselineData) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      baselineData
+                    }))
+                  }}
+                />
+              )}
             </div>
           </Card>
 
@@ -742,18 +789,42 @@ const IndicatorForm = () => {
                 </div>
               </div>
 
-              {/* Componente PostIATab com herança do Baseline */}
-              <PostIATab
-                tipoIndicador={formData.tipoIndicador}
-                baselineData={formData.baselineData}
-                postIAData={formData.postIAData}
-                onPostIAChange={(postIAData) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    postIAData
-                  }))
-                }}
-              />
+              {/* Usar componente específico se disponível, ou PostIATab genérico para outros */}
+              {hasSpecificComponent(formData.tipoIndicador) && indicatorId ? (() => {
+                const SpecificComponent = getIndicatorComponent(formData.tipoIndicador)
+                return (
+                  <SpecificComponent
+                    indicatorId={indicatorId}
+                    baselineData={formData.baselineData}
+                    postIAData={formData.postIAData}
+                    mode="postia"
+                    onBaselineChange={(baselineData) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        baselineData
+                      }))
+                    }}
+                    onPostIAChange={(postIAData) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        postIAData
+                      }))
+                    }}
+                  />
+                )
+              })() : (
+                <PostIATab
+                  tipoIndicador={formData.tipoIndicador}
+                  baselineData={formData.baselineData}
+                  postIAData={formData.postIAData}
+                  onPostIAChange={(postIAData) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      postIAData
+                    }))
+                  }}
+                />
+              )}
             </div>
           </Card>
 

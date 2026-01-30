@@ -12,6 +12,16 @@ import Card from '../common/Card'
  * @param {string} subLabel - Rótulo secundário opcional (ex: "/ano")
  * @param {boolean} isPositive - Se true, usa cor positiva; se false, usa vermelho (para valores negativos)
  */
+/**
+ * Verifica se um valor é válido para exibição (não é null, undefined, NaN, ou string vazia)
+ */
+const isValidValue = (value) => {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'string' && value.trim() === '') return false
+  if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) return false
+  return true
+}
+
 const KPICard = ({
   label,
   value,
@@ -20,6 +30,11 @@ const KPICard = ({
   subLabel,
   isPositive = true
 }) => {
+  // Se o valor não for válido, não renderiza o card
+  if (!isValidValue(value)) {
+    return null
+  }
+
   const colorClasses = {
     green: {
       bg: 'from-green-500/10 to-emerald-500/10',

@@ -237,6 +237,9 @@ const calcularCustoFerramentasAnual = (tools, frequencyAnual = null) => {
       if (tool.tipo === 'anual') {
         return total + toNumber(tool.valor)
       }
+      if (tool.tipo === 'unico') {
+        return total + toNumber(tool.valor)
+      }
       return total + (toNumber(tool.valor) * 12)
     }
 

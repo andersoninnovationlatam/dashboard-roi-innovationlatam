@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { authServiceSupabase } from '../services/authServiceSupabase'
 import { userServiceSupabase } from '../services/userServiceSupabase'
 import { supabase } from '../src/lib/supabase'
@@ -100,7 +100,6 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = authServiceSupabase.onAuthStateChange((newUser, event) => {
         try {
-          
           // CORREÇÃO: Não atualiza INITIAL_SESSION se já temos usuário com mesmo ID
           if (event === 'INITIAL_SESSION') {
             // Só atualiza se não temos usuário ou se o ID mudou
@@ -113,12 +112,11 @@ export const AuthProvider = ({ children }) => {
           if (event === 'SIGNED_OUT') {
             setUser(null)
           } else if (event === 'SIGNED_IN') {
-            
-            // CORREÇÃO CRÍTICA: O callback do authServiceSupabase.onAuthStateChange já retorna
-            // dados completos do usuário (incluindo organization_id e role) após chamar getById().
-            // Não precisamos buscar novamente aqui - isso causa chamadas duplicadas, timeouts
-            // e re-renders desnecessários que podem causar atualização automática da tela.
-            setUser(newUser)
+            // CORREÇÃO CRÍTICA: Só atualiza se o ID do usuário realmente mudou
+            // Isso evita re-renders desnecessários quando o mesmo usuário já está logado
+            if (newUser && newUser.id !== userRef.current?.id) {
+              setUser(newUser)
+            }
           } else if (event === 'TOKEN_REFRESHED') {
             // CORREÇÃO CRÍTICA: Ignora completamente TOKEN_REFRESHED - apenas token mudou
             // O callback já retorna dados básicos sem getById(), então não precisamos atualizar estado
@@ -224,7 +222,7 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authServiceSupabase.logout()
       setUser(null)
@@ -233,7 +231,7 @@ export const AuthProvider = ({ children }) => {
       // Mesmo com erro, limpa o estado local por segurança
       setUser(null)
     }
-  }
+  }, [])
 
   // Métodos de verificação de permissões
   const hasRole = (role) => {

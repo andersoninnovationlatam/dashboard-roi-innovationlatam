@@ -3,6 +3,7 @@ import Card from '../common/Card'
 import BarChart from '../charts/BarChart'
 import LineChart from '../charts/LineChart'
 import { formatarMoeda, formatarHoras } from '../../utils/formatters'
+import { hasValidNonZeroValue } from '../../utils/valueValidators'
 
 /**
  * Componente que renderiza gráficos específicos para indicadores de PRODUTIVIDADE
@@ -168,50 +169,75 @@ const ProdutividadeCharts = ({ metricas }) => {
   }, [todasMetricas])
 
   // Totais consolidados
-  const totalHorasEconomizadas = todasMetricas.reduce((sum, m) => sum + (m.totalHorasEconomizadas || 0), 0)
+  const totalHorasEconomizadas = todasMetricas.reduce((sum, m) => sum + (m.totalHorasEconomizadas || m.horas_economizadas_mes || 0), 0)
   const totalCustoEconomizado = todasMetricas.reduce((sum, m) => sum + (m.totalCustoEconomizado || 0), 0)
   const totalHorasEconomizadasDesejada = todasMetricas.reduce((sum, m) => sum + (m.totalHorasEconomizadasDesejada || 0), 0)
   const totalCustoEconomizadoDesejada = todasMetricas.reduce((sum, m) => sum + (m.totalCustoEconomizadoDesejada || 0), 0)
+  
+  // Delta Produtividade (valor principal)
+  const totalDeltaProdutividade = todasMetricas.reduce((sum, m) => sum + (m.deltaProdutividade || m.delta_produtividade || 0), 0)
 
   return (
     <div className="space-y-6">
       {/* Cards de Resumo */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-          <div className="p-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Horas Economizadas</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {formatarHoras(totalHorasEconomizadas)}
-            </p>
-          </div>
-        </Card>
+        {/* Card Delta Produtividade - Principal */}
+        {hasValidNonZeroValue(totalDeltaProdutividade) && (
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-green-500/10 border-emerald-500/20">
+            <div className="p-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Delta Produtividade</p>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {formatarMoeda(totalDeltaProdutividade)}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                (HH Antes - HH Depois) × Valor Hora
+              </p>
+            </div>
+          </Card>
+        )}
+        {hasValidNonZeroValue(totalHorasEconomizadas) && (
+          <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+            <div className="p-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Horas Economizadas</p>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {formatarHoras(totalHorasEconomizadas)}
+              </p>
+            </div>
+          </Card>
+        )}
 
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
-          <div className="p-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Custo Economizado</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatarMoeda(totalCustoEconomizado)}
-            </p>
-          </div>
-        </Card>
+        {hasValidNonZeroValue(totalCustoEconomizado) && (
+          <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+            <div className="p-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Custo Economizado</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {formatarMoeda(totalCustoEconomizado)}
+              </p>
+            </div>
+          </Card>
+        )}
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-          <div className="p-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">HH Economizadas (Freq. Desejada)</p>
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {formatarHoras(totalHorasEconomizadasDesejada)}
-            </p>
-          </div>
-        </Card>
+        {hasValidNonZeroValue(totalHorasEconomizadasDesejada) && (
+          <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+            <div className="p-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">HH Economizadas (Freq. Desejada)</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                {formatarHoras(totalHorasEconomizadasDesejada)}
+              </p>
+            </div>
+          </Card>
+        )}
 
-        <Card className="bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border-indigo-500/20">
-          <div className="p-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Custo Economizado (Freq. Desejada)</p>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {formatarMoeda(totalCustoEconomizadoDesejada)}
-            </p>
-          </div>
-        </Card>
+        {hasValidNonZeroValue(totalCustoEconomizadoDesejada) && (
+          <Card className="bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border-indigo-500/20">
+            <div className="p-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Custo Economizado (Freq. Desejada)</p>
+              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                {formatarMoeda(totalCustoEconomizadoDesejada)}
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Gráfico 1: Horas Economizada para Execução da Tarefa */}

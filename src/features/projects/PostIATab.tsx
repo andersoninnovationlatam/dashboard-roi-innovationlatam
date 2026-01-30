@@ -1,15 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
-import { 
-  IndicatorType, 
-  BaselineData,
-  ProdutividadePerson,
-  CustosRelacionadosTool
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Plus, Trash2, TrendingUp } from 'lucide-react'
+import {
+  IndicatorType,
+  BaselineData
 } from '../../types/baseline'
 import {
   PostIAData,
-  PostIAProdutividadePerson,
-  PostIACustosRelacionadosTool
+  PostIAProdutividadePerson
 } from '../../types/postIA'
 
 // Mapeamento dos tipos do sistema antigo para os novos tipos
@@ -293,16 +290,17 @@ export const PostIATab = ({
 
   // Atualiza quando baselineData ou postIAData mudam
   useEffect(() => {
-    // Se já existe postIAData salvo, usa ele (não sobrescreve)
+    // Se já existe postIAData salvo, usa ele mas recalcula deltaProdutividade se necessário
     if (postIAData) {
+      // Se for PRODUTIVIDADE e deltaProdutividade for 0 ou não existir, será recalculado no useEffect de cálculos
       setData(postIAData)
       return
     }
-    
+
     if (!baselineData) return
-    
+
     const novoTipo = TIPO_MAPPING[tipoIndicador] || 'PRODUTIVIDADE'
-    
+
     // Só re-herda se o tipo do baseline corresponde ao tipo atual
     if (baselineData.tipo === novoTipo) {
       if (baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData) {
@@ -310,7 +308,7 @@ export const PostIATab = ({
         setData(prevData => {
           // Se já tem dados no Pós-IA, preserva valores preenchidos
           const pessoasExistentes = prevData.tipo === 'PRODUTIVIDADE' && 'pessoas' in prevData ? prevData.pessoas : []
-          
+
           // Mapeia TODAS as pessoas do baseline
           const novasPessoas = baselineData.pessoas.map(p => {
             const existente = pessoasExistentes.find(pp => pp.id === p.id)
@@ -337,7 +335,7 @@ export const PostIATab = ({
               frequenciaDesejada: { ...p.frequenciaDesejada }
             }
           })
-          
+
           return {
             tipo: 'PRODUTIVIDADE',
             pessoaEnvolvida: prevData.tipo === 'PRODUTIVIDADE' ? (prevData.pessoaEnvolvida ?? false) : false,
@@ -465,18 +463,16 @@ export const PostIATab = ({
 
     // Lucro Bruto Baseline
     const lucroBrutoBaseline = baselineData.receitaBrutaMensal - baselineData.custoTotalMensal
-    
+
     // Lucro Bruto Estimado
     const lucroBrutoEstimado = data.receitaBrutaMensalEstimada - data.custoTotalMensalEstimado
-    
+
     // Delta Margem em Reais (diferença de lucro)
     const deltaMargemReais = lucroBrutoEstimado - lucroBrutoBaseline
-    
-    // Economia Mensal = Delta de Custos (se custos diminuíram) + Delta de Receita (se receita aumentou)
-    const deltaCustos = baselineData.custoTotalMensal - data.custoTotalMensalEstimado
-    const deltaReceita = data.receitaBrutaMensalEstimada - baselineData.receitaBrutaMensal
+
+    // Economia Mensal = Delta Margem em Reais
     const economiaMensal = deltaMargemReais // Pode ser positivo (ganho) ou negativo (perda)
-    
+
     // Economia Anual
     const economiaAnual = economiaMensal * 12
 
@@ -488,347 +484,270 @@ export const PostIATab = ({
     }
   }, [data, baselineData])
 
-  // Calcula Métricas de Redução de Risco
-  const calcularMetricasReducaoRisco = useMemo(() => {
-    if (data.tipo !== 'REDUÇÃO DE RISCO' || !baselineData || baselineData.tipo !== 'REDUÇÃO DE RISCO') {
-      return {
-        reducaoProbabilidade: 0,
-        valorRiscoEvitado: 0,
-        economiaMitigacao: 0,
-        beneficioAnual: 0,
-        custoVsBeneficio: 0,
-        roiReducaoRisco: 0
-      }
-    }
-
-    // 1. Redução de Probabilidade (%)
-    const reducaoProbabilidade = baselineData.probabilidadeAtual - data.probabilidadeComIA
-
-    // 2. Valor do Risco Evitado (R$)
-    // Exposição ao risco antes vs depois
-    const exposicaoAntes = (baselineData.probabilidadeAtual / 100) * baselineData.impactoFinanceiro
-    const exposicaoDepois = (data.probabilidadeComIA / 100) * data.impactoFinanceiroReduzido
-    const valorRiscoEvitado = exposicaoAntes - exposicaoDepois
-
-    // 3. Economia em Mitigação (R$/mês)
-    const economiaMitigacao = baselineData.custoMitigacaoAtual - data.custoMitigacaoComIA
-
-    // 4. Benefício Anual (R$)
-    // Benefício = Economia de mitigação anual + Valor do risco evitado (anualizado)
-    const beneficioAnual = (economiaMitigacao * 12) + valorRiscoEvitado
-
-    // 5. Custo vs Benefício
-    // NOTA: O custo de implementação será calculado pelo indicatorMetricsService
-    // que tem acesso ao objeto indicador completo. Aqui usamos 0 como placeholder.
-    const custoImplementacao = 0
-    
-    const custoVsBeneficio = custoImplementacao > 0 
-      ? beneficioAnual / custoImplementacao 
-      : 0
-
-    // 6. ROI da Redução de Risco (%)
-    const roiReducaoRisco = custoImplementacao > 0
-      ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100
-      : 0
-
-    return {
-      reducaoProbabilidade,
-      valorRiscoEvitado,
-      economiaMitigacao,
-      beneficioAnual,
-      custoVsBeneficio,
-      roiReducaoRisco
-    }
-  }, [data, baselineData])
-
-  // Calcula Métricas de Qualidade Decisão
-  const calcularMetricasQualidadeDecisao = useMemo(() => {
-    if (data.tipo !== 'QUALIDADE DECISÃO' || !baselineData || baselineData.tipo !== 'QUALIDADE DECISÃO') {
-      return {
-        melhoriaTaxaAcerto: 0,
-        economiaErrosEvitados: 0,
-        economiaTempo: 0,
-        valorTempoEconomizado: 0,
-        beneficioTotalMensal: 0,
-        roiMelhoria: 0
-      }
-    }
-
-    // 1. Melhoria na Taxa de Acerto (%)
-    const melhoriaTaxaAcerto = data.taxaAcertoComIA - baselineData.taxaAcertoAtual
-
-    // 2. Economia com Erros Evitados (R$/mês)
-    // Normalizar decisões para mensal
-    const fatorBaseline = baselineData.periodo === 'dia' ? 30 : baselineData.periodo === 'semana' ? 4 : 1
-    const fatorComIA = data.periodoComIA === 'dia' ? 30 : data.periodoComIA === 'semana' ? 4 : 1
-    
-    const decisoesMensalBaseline = baselineData.numeroDecisoesPeriodo * fatorBaseline
-    const decisoesMensalComIA = data.numeroDecisoesPeriodoComIA * fatorComIA
-    
-    const decisoesErradasBaseline = decisoesMensalBaseline * (1 - baselineData.taxaAcertoAtual / 100)
-    const decisoesErradasComIA = decisoesMensalComIA * (1 - data.taxaAcertoComIA / 100)
-    
-    const economiaErrosEvitados = (decisoesErradasBaseline * baselineData.custoMedioDecisaoErrada) - 
-                                   (decisoesErradasComIA * data.custoMedioDecisaoErradaComIA)
-
-    // 3. Economia de Tempo (horas/mês)
-    const tempoTotalBaseline = (decisoesMensalBaseline * baselineData.tempoMedioDecisao * baselineData.pessoasEnvolvidas) / 60
-    const tempoTotalComIA = (decisoesMensalComIA * data.tempoMedioDecisaoComIA * data.pessoasEnvolvidasComIA) / 60
-    const economiaTempo = tempoTotalBaseline - tempoTotalComIA
-
-    // 4. Valor do Tempo Economizado (R$)
-    const valorTempoEconomizado = economiaTempo * baselineData.valorHoraMedio
-
-    // 5. Benefício Total Mensal (R$)
-    const beneficioTotalMensal = economiaErrosEvitados + valorTempoEconomizado
-
-    // 6. ROI (placeholder - será calculado no dashboard com custo de implementação)
-    const roiMelhoria = 0
-
-    return {
-      melhoriaTaxaAcerto,
-      economiaErrosEvitados,
-      economiaTempo,
-      valorTempoEconomizado,
-      beneficioTotalMensal,
-      roiMelhoria
-    }
-  }, [data, baselineData])
-
-  // Métricas calculadas para Velocidade
-  const calcularMetricasVelocidade = useMemo(() => {
-    if (data.tipo !== 'VELOCIDADE' || !baselineData || baselineData.tipo !== 'VELOCIDADE') {
-      return {
-        reducaoTempoEntrega: 0,
-        aumentoCapacidade: 0,
-        economiaAtrasos: 0,
-        valorTempoEconomizado: 0,
-        ganhoProdutividade: 0,
-        roiVelocidade: 0
-      }
-    }
-
-    // Normalizar entregas para mensal
-    const fatorBaseline = baselineData.periodoEntregas === 'dia' ? 30 : baselineData.periodoEntregas === 'semana' ? 4 : baselineData.periodoEntregas === 'ano' ? 1/12 : 1
-    const fatorComIA = data.periodoEntregasComIA === 'dia' ? 30 : data.periodoEntregasComIA === 'semana' ? 4 : data.periodoEntregasComIA === 'ano' ? 1/12 : 1
-    
-    const entregasMensalBaseline = baselineData.numeroEntregasPeriodo * fatorBaseline
-    const entregasMensalComIA = data.numeroEntregasPeriodoComIA * fatorComIA
-
-    // Normalizar tempo de entrega para horas
-    const tempoEntregaHorasBaseline = baselineData.unidadeTempoEntrega === 'dias' ? baselineData.tempoMedioEntregaAtual * 24 : baselineData.tempoMedioEntregaAtual
-    const tempoEntregaHorasComIA = data.unidadeTempoEntregaComIA === 'dias' ? data.tempoMedioEntregaComIA * 24 : data.tempoMedioEntregaComIA
-
-    // 1. Redução de Tempo de Entrega (%)
-    const reducaoTempoEntrega = tempoEntregaHorasBaseline > 0
-      ? ((tempoEntregaHorasBaseline - tempoEntregaHorasComIA) / tempoEntregaHorasBaseline) * 100
-      : 0
-
-    // 2. Aumento de Capacidade (entregas/mês)
-    const aumentoCapacidade = entregasMensalComIA - entregasMensalBaseline
-
-    // 3. Economia com Redução de Atrasos (R$/mês)
-    const economiaAtrasos = (baselineData.custoPorAtraso - data.custoPorAtrasoReduzido) * entregasMensalComIA
-
-    // 4. Valor do Tempo Economizado (R$)
-    const horasTotaisBaseline = entregasMensalBaseline * baselineData.tempoTrabalhoPorEntrega * baselineData.pessoasEnvolvidas
-    const horasTotaisComIA = entregasMensalComIA * data.tempoTrabalhoPorEntregaComIA * data.pessoasEnvolvidasComIA
-    const horasEconomizadas = horasTotaisBaseline - horasTotaisComIA
-    const valorTempoEconomizado = horasEconomizadas * baselineData.valorHoraMedio
-
-    // 5. Ganho de Produtividade (%)
-    const ganhoProdutividade = entregasMensalBaseline > 0
-      ? ((entregasMensalComIA - entregasMensalBaseline) / entregasMensalBaseline) * 100
-      : 0
-
-    // 6. ROI da Velocidade (placeholder)
-    const roiVelocidade = 0
-
-    return {
-      reducaoTempoEntrega,
-      aumentoCapacidade,
-      economiaAtrasos,
-      valorTempoEconomizado,
-      ganhoProdutividade,
-      roiVelocidade
-    }
-  }, [data, baselineData])
-
-  // Métricas calculadas para Satisfação
-  const calcularMetricasSatisfacao = useMemo(() => {
-    if (data.tipo !== 'SATISFAÇÃO' || !baselineData || baselineData.tipo !== 'SATISFAÇÃO') {
-      return {
-        deltaSatisfacao: 0,
-        reducaoChurn: 0,
-        valorRetencao: 0,
-        economiaSuporte: 0,
-        aumentoRevenue: 0,
-        roiSatisfacao: 0,
-        ltvIncrementado: 0
-      }
-    }
-
-    // 1. Delta de Satisfação
-    const deltaSatisfacao = data.scoreComIA - baselineData.scoreAtual
-
-    // 2. Redução de Churn (%)
-    const reducaoChurn = baselineData.taxaChurnAtual - data.taxaChurnComIA
-
-    // 3. Valor de Retenção (R$/ano)
-    const clientesRetidos = baselineData.numeroClientes * (reducaoChurn / 100)
-    const valorRetencao = clientesRetidos * baselineData.valorMedioPorCliente * 12
-
-    // 4. Economia com Suporte (R$/mês)
-    const ticketsEvitados = baselineData.ticketMedioSuporte - data.ticketMedioSuporteComIA
-    const custoMedioTicket = 50  // R$ (placeholder)
-    const economiaSuporte = ticketsEvitados * custoMedioTicket
-
-    // 5. Aumento de Revenue (R$/ano)
-    const aumentoRevenue = (data.numeroClientesEsperado * data.valorMedioPorClienteComIA * 12) - 
-                           (baselineData.numeroClientes * baselineData.valorMedioPorCliente * 12)
-
-    // 6. LTV Incrementado
-    const ltvAntes = baselineData.taxaChurnAtual > 0 
-      ? baselineData.valorMedioPorCliente / (baselineData.taxaChurnAtual / 100)
-      : 0
-    const ltvDepois = data.taxaChurnComIA > 0
-      ? data.valorMedioPorClienteComIA / (data.taxaChurnComIA / 100)
-      : 0
-    const ltvIncrementado = ltvDepois - ltvAntes
-
-    // 7. ROI da Satisfação (placeholder)
-    const roiSatisfacao = 0
-
-    return {
-      deltaSatisfacao,
-      reducaoChurn,
-      valorRetencao,
-      economiaSuporte,
-      aumentoRevenue,
-      roiSatisfacao,
-      ltvIncrementado
-    }
-  }, [data, baselineData])
+  // Ref para evitar loops infinitos - rastreia se já inicializamos os campos calculados
+  const hasInitializedRef = useRef<Record<string, boolean>>({})
 
   // Atualiza cálculos quando dados mudam
   useEffect(() => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
       const custoTotal = calcularCustoTotalPostIA(data.pessoas)
+      // Calcula deltaProdutividade diretamente aqui para evitar dependência de useMemo
+      let deltaProdutividade = 0
+      if (baselineData && baselineData.tipo === 'PRODUTIVIDADE' && 'pessoas' in baselineData && 'pessoas' in data) {
+        const pessoasBaseline = baselineData.pessoas || []
+        const pessoasPostIA = data.pessoas || []
+        deltaProdutividade = pessoasPostIA.reduce((total, pessoaPostIA) => {
+          const pessoaBaseline = pessoasBaseline.find(p => p.id === pessoaPostIA.id)
+          if (!pessoaBaseline) return total
+          const horasBaseline = calcularHorasPorMes(pessoaBaseline.frequenciaReal.quantidade, pessoaBaseline.frequenciaReal.periodo)
+          const horasPostIA = horasBaseline
+          const hhAntes = (pessoaBaseline.tempoGasto / 60) * horasBaseline
+          const hhDepois = (pessoaPostIA.tempoGasto / 60) * horasPostIA
+          const delta = (hhAntes - hhDepois) * pessoaPostIA.valorHora
+          return total + delta
+        }, 0)
+      }
       const updatedData: PostIAData = {
         ...data,
         custoTotalPostIA: custoTotal,
-        deltaProdutividade: calcularDeltaProdutividade
+        deltaProdutividade
       }
-      if (updatedData.custoTotalPostIA !== data.custoTotalPostIA || updatedData.deltaProdutividade !== data.deltaProdutividade) {
+      // Sempre atualiza se deltaProdutividade mudou ou se estava zerado/indefinido
+      const key = `PRODUTIVIDADE_${data.pessoas.length}_${data.pessoas.map(p => `${p.id}-${p.tempoGasto}`).join('_')}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        updatedData.custoTotalPostIA !== data.custoTotalPostIA ||
+        updatedData.deltaProdutividade !== data.deltaProdutividade ||
+        (data.deltaProdutividade === 0 && deltaProdutividade !== 0) ||
+        (data.deltaProdutividade === undefined)
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
     } else if (data.tipo === 'INCREMENTO RECEITA') {
+      // Calcula deltaReceita diretamente aqui para evitar dependência de useMemo
+      const deltaReceita = baselineData && baselineData.tipo === 'INCREMENTO RECEITA' && 'valorReceitaAntes' in baselineData && 'valorReceitaDepois' in data
+        ? data.valorReceitaDepois - (baselineData.valorReceitaAntes || 0)
+        : 0
       const updatedData: PostIAData = {
         ...data,
-        deltaReceita: calcularDeltaReceita
+        deltaReceita
       }
-      if (updatedData.deltaReceita !== data.deltaReceita) {
+      const key = `INCREMENTO_RECEITA_${data.valorReceitaDepois}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        updatedData.deltaReceita !== data.deltaReceita
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
-    } else if (data.tipo === 'MELHORIA MARGEM') {
-      const metricas = calcularMetricasMelhoriaMargem
+    } else if (data.tipo === 'MELHORIA MARGEM' && baselineData && baselineData.tipo === 'MELHORIA MARGEM') {
+      // Calcula métricas diretamente aqui para evitar dependência de useMemo
+      const deltaMargem = data.margemBrutaEstimada - baselineData.margemBrutaAtual
+      const lucroBrutoBaseline = baselineData.receitaBrutaMensal - baselineData.custoTotalMensal
+      const lucroBrutoEstimado = data.receitaBrutaMensalEstimada - data.custoTotalMensalEstimado
+      const deltaMargemReais = lucroBrutoEstimado - lucroBrutoBaseline
+      const economiaMensal = deltaMargemReais
+      const economiaAnual = economiaMensal * 12
+
       const updatedData: PostIAData = {
         ...data,
-        deltaMargem: metricas.deltaMargem,
-        deltaMargemReais: metricas.deltaMargemReais,
-        economiaMensal: metricas.economiaMensal,
-        economiaAnual: metricas.economiaAnual
+        deltaMargem,
+        deltaMargemReais,
+        economiaMensal,
+        economiaAnual
       }
-      if (
+      // CORREÇÃO: Verifica se algum campo está undefined OU se mudou
+      const key = `MELHORIA_MARGEM_${data.receitaBrutaMensalEstimada}_${data.custoTotalMensalEstimado}_${data.margemBrutaEstimada}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        data.deltaMargem === undefined ||
+        data.deltaMargemReais === undefined ||
+        data.economiaMensal === undefined ||
+        data.economiaAnual === undefined ||
         updatedData.deltaMargem !== data.deltaMargem ||
         updatedData.deltaMargemReais !== data.deltaMargemReais ||
         updatedData.economiaMensal !== data.economiaMensal ||
         updatedData.economiaAnual !== data.economiaAnual
-      ) {
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
-    } else if (data.tipo === 'REDUÇÃO DE RISCO') {
-      const metricas = calcularMetricasReducaoRisco
+    } else if (data.tipo === 'REDUÇÃO DE RISCO' && baselineData && baselineData.tipo === 'REDUÇÃO DE RISCO') {
+      // Calcula métricas diretamente aqui para evitar dependência de useMemo
+      const reducaoProbabilidade = baselineData.probabilidadeAtual - data.probabilidadeComIA
+      const exposicaoAntes = (baselineData.probabilidadeAtual / 100) * baselineData.impactoFinanceiro
+      const exposicaoDepois = (data.probabilidadeComIA / 100) * data.impactoFinanceiroReduzido
+      const valorRiscoEvitado = exposicaoAntes - exposicaoDepois
+      const economiaMitigacao = baselineData.custoMitigacaoAtual - data.custoMitigacaoComIA
+      const beneficioAnual = (economiaMitigacao * 12) + valorRiscoEvitado
+      const custoImplementacao = 0
+      const custoVsBeneficio = custoImplementacao > 0 ? beneficioAnual / custoImplementacao : 0
+      const roiReducaoRisco = custoImplementacao > 0 ? ((beneficioAnual - custoImplementacao) / custoImplementacao) * 100 : 0
+
       const updatedData: PostIAData = {
         ...data,
-        reducaoProbabilidade: metricas.reducaoProbabilidade,
-        valorRiscoEvitado: metricas.valorRiscoEvitado,
-        economiaMitigacao: metricas.economiaMitigacao,
-        beneficioAnual: metricas.beneficioAnual,
-        custoVsBeneficio: metricas.custoVsBeneficio,
-        roiReducaoRisco: metricas.roiReducaoRisco
+        reducaoProbabilidade,
+        valorRiscoEvitado,
+        economiaMitigacao,
+        beneficioAnual,
+        custoVsBeneficio,
+        roiReducaoRisco
       }
-      if (
+      // CORREÇÃO: Verifica se algum campo está undefined OU se mudou
+      const key = `REDUCAO_RISCO_${data.probabilidadeComIA}_${data.custoMitigacaoComIA}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        data.reducaoProbabilidade === undefined ||
+        data.valorRiscoEvitado === undefined ||
+        data.economiaMitigacao === undefined ||
+        data.beneficioAnual === undefined ||
+        data.custoVsBeneficio === undefined ||
+        data.roiReducaoRisco === undefined ||
         updatedData.reducaoProbabilidade !== data.reducaoProbabilidade ||
         updatedData.valorRiscoEvitado !== data.valorRiscoEvitado ||
         updatedData.economiaMitigacao !== data.economiaMitigacao ||
         updatedData.beneficioAnual !== data.beneficioAnual ||
         updatedData.custoVsBeneficio !== data.custoVsBeneficio ||
         updatedData.roiReducaoRisco !== data.roiReducaoRisco
-      ) {
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
-    } else if (data.tipo === 'QUALIDADE DECISÃO') {
-      const metricas = calcularMetricasQualidadeDecisao
+    } else if (data.tipo === 'QUALIDADE DECISÃO' && baselineData && baselineData.tipo === 'QUALIDADE DECISÃO') {
+      // Calcula métricas diretamente aqui para evitar dependência de useMemo
+      const melhoriaTaxaAcerto = data.taxaAcertoComIA - baselineData.taxaAcertoAtual
+      const fatorBaseline = baselineData.periodo === 'dia' ? 30 : baselineData.periodo === 'semana' ? 4 : 1
+      const fatorComIA = data.periodoComIA === 'dia' ? 30 : data.periodoComIA === 'semana' ? 4 : 1
+      const decisoesMensalBaseline = baselineData.numeroDecisoesPeriodo * fatorBaseline
+      const decisoesMensalComIA = data.numeroDecisoesPeriodoComIA * fatorComIA
+      const decisoesErradasBaseline = decisoesMensalBaseline * (1 - baselineData.taxaAcertoAtual / 100)
+      const decisoesErradasComIA = decisoesMensalComIA * (1 - data.taxaAcertoComIA / 100)
+      const economiaErrosEvitados = (decisoesErradasBaseline * baselineData.custoMedioDecisaoErrada) - (decisoesErradasComIA * data.custoMedioDecisaoErradaComIA)
+      const tempoTotalBaseline = (decisoesMensalBaseline * baselineData.tempoMedioDecisao * baselineData.pessoasEnvolvidas) / 60
+      const tempoTotalComIA = (decisoesMensalComIA * data.tempoMedioDecisaoComIA * data.pessoasEnvolvidasComIA) / 60
+      const economiaTempo = tempoTotalBaseline - tempoTotalComIA
+      const valorTempoEconomizado = economiaTempo * baselineData.valorHoraMedio
+      const beneficioTotalMensal = economiaErrosEvitados + valorTempoEconomizado
+      const roiMelhoria = 0
+
       const updatedData: PostIAData = {
         ...data,
-        melhoriaTaxaAcerto: metricas.melhoriaTaxaAcerto,
-        economiaErrosEvitados: metricas.economiaErrosEvitados,
-        economiaTempo: metricas.economiaTempo,
-        valorTempoEconomizado: metricas.valorTempoEconomizado,
-        beneficioTotalMensal: metricas.beneficioTotalMensal,
-        roiMelhoria: metricas.roiMelhoria
+        melhoriaTaxaAcerto,
+        economiaErrosEvitados,
+        economiaTempo,
+        valorTempoEconomizado,
+        beneficioTotalMensal,
+        roiMelhoria
       }
-      if (
+      // CORREÇÃO: Verifica se algum campo está undefined OU se mudou
+      const key = `QUALIDADE_DECISAO_${data.taxaAcertoComIA}_${data.tempoMedioDecisaoComIA}_${data.custoMedioDecisaoErradaComIA}_${data.numeroDecisoesPeriodoComIA}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        data.melhoriaTaxaAcerto === undefined ||
+        data.economiaErrosEvitados === undefined ||
+        data.economiaTempo === undefined ||
+        data.valorTempoEconomizado === undefined ||
+        data.beneficioTotalMensal === undefined ||
+        data.roiMelhoria === undefined ||
         updatedData.melhoriaTaxaAcerto !== data.melhoriaTaxaAcerto ||
         updatedData.economiaErrosEvitados !== data.economiaErrosEvitados ||
         updatedData.economiaTempo !== data.economiaTempo ||
         updatedData.valorTempoEconomizado !== data.valorTempoEconomizado ||
         updatedData.beneficioTotalMensal !== data.beneficioTotalMensal ||
         updatedData.roiMelhoria !== data.roiMelhoria
-      ) {
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
-    } else if (data.tipo === 'VELOCIDADE') {
-      const metricas = calcularMetricasVelocidade
+    } else if (data.tipo === 'VELOCIDADE' && baselineData && baselineData.tipo === 'VELOCIDADE') {
+      // Calcula métricas diretamente aqui para evitar dependência de useMemo
+      const fatorBaseline = baselineData.periodoEntregas === 'dia' ? 30 : baselineData.periodoEntregas === 'semana' ? 4 : baselineData.periodoEntregas === 'ano' ? 1 / 12 : 1
+      const fatorComIA = data.periodoEntregasComIA === 'dia' ? 30 : data.periodoEntregasComIA === 'semana' ? 4 : data.periodoEntregasComIA === 'ano' ? 1 / 12 : 1
+      const entregasMensalBaseline = baselineData.numeroEntregasPeriodo * fatorBaseline
+      const entregasMensalComIA = data.numeroEntregasPeriodoComIA * fatorComIA
+      const tempoEntregaHorasBaseline = baselineData.unidadeTempoEntrega === 'dias' ? baselineData.tempoMedioEntregaAtual * 24 : baselineData.tempoMedioEntregaAtual
+      const tempoEntregaHorasComIA = data.unidadeTempoEntregaComIA === 'dias' ? data.tempoMedioEntregaComIA * 24 : data.tempoMedioEntregaComIA
+      const reducaoTempoEntrega = tempoEntregaHorasBaseline > 0 ? ((tempoEntregaHorasBaseline - tempoEntregaHorasComIA) / tempoEntregaHorasBaseline) * 100 : 0
+      const aumentoCapacidade = entregasMensalComIA - entregasMensalBaseline
+      const economiaAtrasos = (baselineData.custoPorAtraso - data.custoPorAtrasoReduzido) * entregasMensalComIA
+      const horasTotaisBaseline = entregasMensalBaseline * baselineData.tempoTrabalhoPorEntrega * baselineData.pessoasEnvolvidas
+      const horasTotaisComIA = entregasMensalComIA * data.tempoTrabalhoPorEntregaComIA * data.pessoasEnvolvidasComIA
+      const horasEconomizadas = horasTotaisBaseline - horasTotaisComIA
+      const valorTempoEconomizado = horasEconomizadas * baselineData.valorHoraMedio
+      const ganhoProdutividade = entregasMensalBaseline > 0 ? ((entregasMensalComIA - entregasMensalBaseline) / entregasMensalBaseline) * 100 : 0
+      const roiVelocidade = 0
+
       const updatedData: PostIAData = {
         ...data,
-        reducaoTempoEntrega: metricas.reducaoTempoEntrega,
-        aumentoCapacidade: metricas.aumentoCapacidade,
-        economiaAtrasos: metricas.economiaAtrasos,
-        valorTempoEconomizado: metricas.valorTempoEconomizado,
-        ganhoProdutividade: metricas.ganhoProdutividade,
-        roiVelocidade: metricas.roiVelocidade
+        reducaoTempoEntrega,
+        aumentoCapacidade,
+        economiaAtrasos,
+        valorTempoEconomizado,
+        ganhoProdutividade,
+        roiVelocidade
       }
-      if (
+      // CORREÇÃO: Verifica se algum campo está undefined OU se mudou
+      const key = `VELOCIDADE_${data.tempoMedioEntregaComIA}_${data.numeroEntregasPeriodoComIA}_${data.periodoEntregasComIA}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        data.reducaoTempoEntrega === undefined ||
+        data.aumentoCapacidade === undefined ||
+        data.economiaAtrasos === undefined ||
+        data.valorTempoEconomizado === undefined ||
+        data.ganhoProdutividade === undefined ||
+        data.roiVelocidade === undefined ||
         updatedData.reducaoTempoEntrega !== data.reducaoTempoEntrega ||
         updatedData.aumentoCapacidade !== data.aumentoCapacidade ||
         updatedData.economiaAtrasos !== data.economiaAtrasos ||
         updatedData.valorTempoEconomizado !== data.valorTempoEconomizado ||
         updatedData.ganhoProdutividade !== data.ganhoProdutividade ||
         updatedData.roiVelocidade !== data.roiVelocidade
-      ) {
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
-    } else if (data.tipo === 'SATISFAÇÃO') {
-      const metricas = calcularMetricasSatisfacao
+    } else if (data.tipo === 'SATISFAÇÃO' && baselineData && baselineData.tipo === 'SATISFAÇÃO') {
+      // Calcula métricas diretamente aqui para evitar dependência de useMemo
+      const deltaSatisfacao = data.scoreComIA - baselineData.scoreAtual
+      const reducaoChurn = baselineData.taxaChurnAtual - data.taxaChurnComIA
+      const clientesRetidos = baselineData.numeroClientes * (reducaoChurn / 100)
+      const valorRetencao = clientesRetidos * baselineData.valorMedioPorCliente * 12
+      const ticketsEvitados = baselineData.ticketMedioSuporte - data.ticketMedioSuporteComIA
+      const custoMedioTicket = 50
+      const economiaSuporte = ticketsEvitados * custoMedioTicket
+      const aumentoRevenue = (data.numeroClientesEsperado * data.valorMedioPorClienteComIA * 12) - (baselineData.numeroClientes * baselineData.valorMedioPorCliente * 12)
+      const ltvAntes = baselineData.taxaChurnAtual > 0 ? baselineData.valorMedioPorCliente / (baselineData.taxaChurnAtual / 100) : 0
+      const ltvDepois = data.taxaChurnComIA > 0 ? data.valorMedioPorClienteComIA / (data.taxaChurnComIA / 100) : 0
+      const ltvIncrementado = ltvDepois - ltvAntes
+      const roiSatisfacao = 0
+
       const updatedData: PostIAData = {
         ...data,
-        deltaSatisfacao: metricas.deltaSatisfacao,
-        reducaoChurn: metricas.reducaoChurn,
-        valorRetencao: metricas.valorRetencao,
-        economiaSuporte: metricas.economiaSuporte,
-        aumentoRevenue: metricas.aumentoRevenue,
-        roiSatisfacao: metricas.roiSatisfacao,
-        ltvIncrementado: metricas.ltvIncrementado
+        deltaSatisfacao,
+        reducaoChurn,
+        valorRetencao,
+        economiaSuporte,
+        aumentoRevenue,
+        roiSatisfacao,
+        ltvIncrementado
       }
-      if (
+      // CORREÇÃO: Verifica se algum campo está undefined OU se mudou
+      const key = `SATISFACAO_${data.scoreComIA}_${data.taxaChurnComIA}_${data.numeroClientesEsperado}`
+      const needsUpdate = !hasInitializedRef.current[key] ||
+        data.deltaSatisfacao === undefined ||
+        data.reducaoChurn === undefined ||
+        data.valorRetencao === undefined ||
+        data.economiaSuporte === undefined ||
+        data.aumentoRevenue === undefined ||
+        data.roiSatisfacao === undefined ||
+        data.ltvIncrementado === undefined ||
         updatedData.deltaSatisfacao !== data.deltaSatisfacao ||
         updatedData.reducaoChurn !== data.reducaoChurn ||
         updatedData.valorRetencao !== data.valorRetencao ||
@@ -836,23 +755,40 @@ export const PostIATab = ({
         updatedData.aumentoRevenue !== data.aumentoRevenue ||
         updatedData.roiSatisfacao !== data.roiSatisfacao ||
         updatedData.ltvIncrementado !== data.ltvIncrementado
-      ) {
+
+      if (needsUpdate) {
+        hasInitializedRef.current[key] = true
         setData(updatedData)
         onPostIAChange?.(updatedData)
       }
     }
-  }, [calcularDeltaProdutividade, calcularDeltaReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, calcularMetricasSatisfacao, data])
+  }, [
+    baselineData,
+    data.tipo,
+    // Apenas campos de entrada específicos (não useMemo, não campos calculados)
+    ...(data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data ? [data.pessoas.length] : []),
+    ...(data.tipo === 'INCREMENTO RECEITA' && 'valorReceitaDepois' in data ? [data.valorReceitaDepois] : []),
+    ...(data.tipo === 'MELHORIA MARGEM' && 'receitaBrutaMensalEstimada' in data ? [data.receitaBrutaMensalEstimada, data.custoTotalMensalEstimado, data.margemBrutaEstimada] : []),
+    ...(data.tipo === 'REDUÇÃO DE RISCO' && 'probabilidadeComIA' in data ? [data.probabilidadeComIA, data.custoMitigacaoComIA, data.impactoFinanceiroReduzido] : []),
+    ...(data.tipo === 'QUALIDADE DECISÃO' && 'taxaAcertoComIA' in data ? [data.taxaAcertoComIA, data.tempoMedioDecisaoComIA, data.custoMedioDecisaoErradaComIA, data.numeroDecisoesPeriodoComIA, data.periodoComIA, data.pessoasEnvolvidasComIA] : []),
+    ...(data.tipo === 'VELOCIDADE' && 'tempoMedioEntregaComIA' in data ? [data.tempoMedioEntregaComIA, data.numeroEntregasPeriodoComIA, data.periodoEntregasComIA, data.custoPorAtrasoReduzido, data.tempoTrabalhoPorEntregaComIA, data.pessoasEnvolvidasComIA, data.unidadeTempoEntregaComIA] : []),
+    ...(data.tipo === 'SATISFAÇÃO' && 'scoreComIA' in data ? [data.scoreComIA, data.taxaChurnComIA, data.numeroClientesEsperado, data.valorMedioPorClienteComIA, data.ticketMedioSuporteComIA] : [])
+  ])
 
   const updatePessoa = (index: number, field: string, value: any) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
       const updatedPessoas = [...data.pessoas]
       if (field.includes('.')) {
         const [parent, child] = field.split('.')
-        updatedPessoas[index] = {
-          ...updatedPessoas[index],
-          [parent]: {
-            ...updatedPessoas[index][parent as keyof PostIAProdutividadePerson],
-            [child]: value
+        const pessoaAtual = updatedPessoas[index]
+        const parentValue = pessoaAtual[parent as keyof PostIAProdutividadePerson]
+        if (parentValue && typeof parentValue === 'object' && !Array.isArray(parentValue)) {
+          updatedPessoas[index] = {
+            ...pessoaAtual,
+            [parent]: {
+              ...parentValue,
+              [child]: value
+            }
           }
         }
       } else {
@@ -920,11 +856,7 @@ export const PostIATab = ({
 
   const removePessoaManual = (pessoaId: string) => {
     if (data.tipo === 'PRODUTIVIDADE' && 'pessoas' in data) {
-      // Só permite remover se for pessoa manual
-      if (!isPessoaManual(pessoaId)) {
-        alert('Pessoas do Baseline não podem ser removidas aqui. Desmarque no dropdown acima.')
-        return
-      }
+      // Permite remover qualquer métrica (manual ou do baseline)
       const updatedPessoas = data.pessoas.filter(p => p.id !== pessoaId)
       const custoTotal = calcularCustoTotalPostIA(updatedPessoas)
       const updatedData: PostIAData = {
@@ -1055,8 +987,8 @@ export const PostIATab = ({
                     <div className="space-y-3">
                       {baselineData.pessoas.map((pessoaBaseline, index) => {
                         const isSelected = data.pessoas.some(
-                          p => p.id === pessoaBaseline.id || 
-                          (p.id === undefined && p.nome === pessoaBaseline.nome)
+                          p => p.id === pessoaBaseline.id ||
+                            (p.id === undefined && p.nome === pessoaBaseline.nome)
                         )
 
                         return (
@@ -1074,8 +1006,8 @@ export const PostIATab = ({
                                 if (e.target.checked) {
                                   // Verifica se pessoa já existe
                                   const pessoaExistenteIndex = data.pessoas.findIndex(
-                                    p => p.id === pessoaBaseline.id || 
-                                    (p.id === undefined && p.nome === pessoaBaseline.nome)
+                                    p => p.id === pessoaBaseline.id ||
+                                      (p.id === undefined && p.nome === pessoaBaseline.nome)
                                   )
 
                                   // Cria objeto pessoa com dados do Baseline
@@ -1111,8 +1043,8 @@ export const PostIATab = ({
                                   const updatedData: PostIAData = {
                                     ...data,
                                     pessoas: data.pessoas.filter(
-                                      p => p.id !== pessoaBaseline.id && 
-                                      (p.id !== undefined || p.nome !== pessoaBaseline.nome)
+                                      p => p.id !== pessoaBaseline.id &&
+                                        (p.id !== undefined || p.nome !== pessoaBaseline.nome)
                                     )
                                   }
                                   updateData(updatedData)
@@ -1168,7 +1100,7 @@ export const PostIATab = ({
               {data.pessoas.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
                   <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    {data.pessoaEnvolvida 
+                    {data.pessoaEnvolvida
                       ? 'Selecione pessoas do Baseline acima ou clique em "Adicionar Métrica"'
                       : 'Clique em "Adicionar Métrica" para começar'}
                   </p>
@@ -1180,11 +1112,10 @@ export const PostIATab = ({
                     return (
                       <div
                         key={pessoa.id || index}
-                        className={`p-4 border rounded-lg ${
-                          isManual 
-                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' 
-                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-                        }`}
+                        className={`p-4 border rounded-lg ${isManual
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
@@ -1197,20 +1128,18 @@ export const PostIATab = ({
                               </span>
                             )}
                             {!isManual && (
-                              <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded">
-                                Baseline
+                              <span className="px-2 py-1 text-xs bg-green-600 text-white rounded">
+                                PósIA
                               </span>
                             )}
                           </div>
-                          {isManual && (
-                            <button
-                              onClick={() => removePessoaManual(pessoa.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                              title="Remover métrica manual"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => removePessoaManual(pessoa.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Remover métrica"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1270,9 +1199,8 @@ export const PostIATab = ({
                                 const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
                                 updatePessoa(index, 'tempoGasto', val)
                               }}
-                              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white ${
-                                !isManual ? 'border-green-300 dark:border-green-600' : 'border-slate-300 dark:border-slate-600'
-                              }`}
+                              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white ${!isManual ? 'border-green-300 dark:border-green-600' : 'border-slate-300 dark:border-slate-600'
+                                }`}
                               placeholder="0"
                             />
                           </div>
@@ -1367,16 +1295,16 @@ export const PostIATab = ({
                       Custo Total Pós-IA (Mensal):
                     </span>
                     <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                      R$ {data.custoTotalPostIA.toLocaleString('pt-BR', {
+                      R$ {(data.custoTotalPostIA ?? 0).toLocaleString('pt-BR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })}
                     </span>
                   </div>
                 </div>
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                {/*<div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
                       <span className="font-semibold text-slate-900 dark:text-white">
                         Delta Produtividade:
@@ -1392,7 +1320,7 @@ export const PostIATab = ({
                   <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
                     (HH Antes - HH Depois) × Valor Hora
                   </p>
-                </div>
+                </div>*/}
               </div>
             )}
           </div>
@@ -1544,7 +1472,7 @@ export const PostIATab = ({
                     Custo Total de Implementação:
                   </span>
                   <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                    R$ {data.custoTotalImplementacao.toLocaleString('pt-BR', {
+                    R$ {(data.custoTotalImplementacao ?? 0).toLocaleString('pt-BR', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
                     })}
@@ -1668,11 +1596,11 @@ export const PostIATab = ({
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                        {calcularMetricasMelhoriaMargem.deltaMargem > 0 ? '+' : ''}
-                        {calcularMetricasMelhoriaMargem.deltaMargem.toFixed(2)}%
+                        {(calcularMetricasMelhoriaMargem.deltaMargem > 0 ? '+' : '')}
+                        {(calcularMetricasMelhoriaMargem.deltaMargem ?? 0).toFixed(2)}%
                       </div>
                       <div className="text-sm text-slate-600 dark:text-slate-400">
-                        R$ {calcularMetricasMelhoriaMargem.deltaMargemReais.toLocaleString('pt-BR', {
+                        R$ {(calcularMetricasMelhoriaMargem.deltaMargemReais ?? 0).toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
                         })}
@@ -1680,7 +1608,7 @@ export const PostIATab = ({
                     </div>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Margem Estimada ({data.margemBrutaEstimada.toFixed(2)}%) - Margem Atual ({baselineData.margemBrutaAtual.toFixed(2)}%)
+                    Margem Estimada ({(data.margemBrutaEstimada ?? 0).toFixed(2)}%) - Margem Atual ({(baselineData.margemBrutaAtual ?? 0).toFixed(2)}%)
                   </p>
                 </div>
 
@@ -1692,7 +1620,7 @@ export const PostIATab = ({
                         Economia Mensal
                       </span>
                       <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                        R$ {calcularMetricasMelhoriaMargem.economiaMensal.toLocaleString('pt-BR', {
+                        R$ {(calcularMetricasMelhoriaMargem.economiaMensal ?? 0).toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
                         })}
@@ -1705,7 +1633,7 @@ export const PostIATab = ({
                         Economia Anual
                       </span>
                       <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                        R$ {calcularMetricasMelhoriaMargem.economiaAnual.toLocaleString('pt-BR', {
+                        R$ {(calcularMetricasMelhoriaMargem.economiaAnual ?? 0).toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
                         })}
@@ -1724,19 +1652,19 @@ export const PostIATab = ({
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Receita:</span>
                           <span className="ml-2 font-medium text-slate-900 dark:text-white">
-                            R$ {baselineData.receitaBrutaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {(baselineData.receitaBrutaMensal ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Custo:</span>
                           <span className="ml-2 font-medium text-slate-900 dark:text-white">
-                            R$ {baselineData.custoTotalMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {(baselineData.custoTotalMensal ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Lucro:</span>
                           <span className="ml-2 font-medium text-slate-900 dark:text-white">
-                            R$ {(baselineData.receitaBrutaMensal - baselineData.custoTotalMensal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {((baselineData.receitaBrutaMensal ?? 0) - (baselineData.custoTotalMensal ?? 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
@@ -1747,19 +1675,19 @@ export const PostIATab = ({
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Receita:</span>
                           <span className="ml-2 font-medium text-green-600 dark:text-green-400">
-                            R$ {data.receitaBrutaMensalEstimada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {(data.receitaBrutaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Custo:</span>
                           <span className="ml-2 font-medium text-green-600 dark:text-green-400">
-                            R$ {data.custoTotalMensalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {(data.custoTotalMensalEstimado ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400">Lucro:</span>
                           <span className="ml-2 font-medium text-green-600 dark:text-green-400">
-                            R$ {(data.receitaBrutaMensalEstimada - data.custoTotalMensalEstimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {((data.receitaBrutaMensalEstimada ?? 0) - (data.custoTotalMensalEstimado ?? 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
@@ -1859,7 +1787,7 @@ export const PostIATab = ({
                       const updatedData: PostIAData = {
                         ...data,
                         periodoAvaliacaoComIA: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
-                      }
+                      } as PostIAData
                       updateData(updatedData)
                     }}
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1906,10 +1834,10 @@ export const PostIATab = ({
                   Redução de Probabilidade
                 </h4>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {data.reducaoProbabilidade > 0 ? '-' : ''}{Math.abs(data.reducaoProbabilidade).toFixed(2)}%
+                  {((data.reducaoProbabilidade ?? 0) > 0 ? '-' : '')}{Math.abs(data.reducaoProbabilidade ?? 0).toFixed(2)}%
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {baselineData.probabilidadeAtual.toFixed(2)}% → {data.probabilidadeComIA.toFixed(2)}%
+                  {(baselineData.probabilidadeAtual ?? 0).toFixed(2)}% → {(data.probabilidadeComIA ?? 0).toFixed(2)}%
                 </p>
               </div>
 
@@ -1919,7 +1847,7 @@ export const PostIATab = ({
                   Valor do Risco Evitado
                 </h4>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  R$ {data.valorRiscoEvitado.toLocaleString('pt-BR', {
+                  R$ {(data.valorRiscoEvitado ?? 0).toLocaleString('pt-BR', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}
@@ -1935,7 +1863,7 @@ export const PostIATab = ({
                   Economia em Mitigação
                 </h4>
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  R$ {data.economiaMitigacao.toLocaleString('pt-BR', {
+                  R$ {(data.economiaMitigacao ?? 0).toLocaleString('pt-BR', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}/mês
@@ -1951,7 +1879,7 @@ export const PostIATab = ({
                   Benefício Anual
                 </h4>
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  R$ {data.beneficioAnual.toLocaleString('pt-BR', {
+                  R$ {(data.beneficioAnual ?? 0).toLocaleString('pt-BR', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}
@@ -1967,10 +1895,10 @@ export const PostIATab = ({
                   Custo vs Benefício
                 </h4>
                 <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                  {data.custoVsBeneficio > 0 ? data.custoVsBeneficio.toFixed(2) : 'N/A'}
+                  {(data.custoVsBeneficio ?? 0) > 0 ? (data.custoVsBeneficio ?? 0).toFixed(2) : 'N/A'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {data.custoVsBeneficio > 1 ? `${data.custoVsBeneficio.toFixed(2)}x de retorno` : 'Razão benefício/custo'}
+                  {(data.custoVsBeneficio ?? 0) > 1 ? `${(data.custoVsBeneficio ?? 0).toFixed(2)}x de retorno` : 'Razão benefício/custo'}
                 </p>
               </div>
 
@@ -1980,7 +1908,7 @@ export const PostIATab = ({
                   ROI da Redução de Risco
                 </h4>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {data.roiReducaoRisco > 0 ? '+' : ''}{data.roiReducaoRisco.toFixed(1)}%
+                  {((data.roiReducaoRisco ?? 0) > 0 ? '+' : '')}{(data.roiReducaoRisco ?? 0).toFixed(1)}%
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Retorno sobre investimento
@@ -1998,25 +1926,25 @@ export const PostIATab = ({
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Probabilidade:</span>
                       <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
-                        {baselineData.probabilidadeAtual.toFixed(2)}%
+                        {(baselineData.probabilidadeAtual ?? 0).toFixed(2)}%
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Impacto:</span>
                       <span className="ml-2 font-semibold text-slate-900 dark:text-white">
-                        R$ {baselineData.impactoFinanceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(baselineData.impactoFinanceiro ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Exposição:</span>
                       <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
-                        R$ {((baselineData.probabilidadeAtual / 100) * baselineData.impactoFinanceiro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(((baselineData.probabilidadeAtual ?? 0) / 100) * (baselineData.impactoFinanceiro ?? 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Custo Mitigação:</span>
                       <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
-                        R$ {baselineData.custoMitigacaoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                        R$ {(baselineData.custoMitigacaoAtual ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                       </span>
                     </div>
                   </div>
@@ -2027,13 +1955,13 @@ export const PostIATab = ({
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Probabilidade:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        {data.probabilidadeComIA.toFixed(2)}%
+                        {(data.probabilidadeComIA ?? 0).toFixed(2)}%
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Impacto:</span>
                       <span className="ml-2 font-semibold text-slate-900 dark:text-white">
-                        R$ {data.impactoFinanceiroReduzido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(data.impactoFinanceiroReduzido ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div>
@@ -2045,7 +1973,7 @@ export const PostIATab = ({
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Custo Mitigação:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        R$ {data.custoMitigacaoComIA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                        R$ {(data.custoMitigacaoComIA ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                       </span>
                     </div>
                   </div>
@@ -2093,7 +2021,7 @@ export const PostIATab = ({
                       const updatedData: PostIAData = {
                         ...data,
                         periodoComIA: e.target.value as 'dia' | 'semana' | 'mês' | 'ano'
-                      }
+                      } as PostIAData
                       updateData(updatedData)
                     }}
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -2216,7 +2144,7 @@ export const PostIATab = ({
                   Melhoria Taxa Acerto
                 </h4>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {data.melhoriaTaxaAcerto > 0 ? '+' : ''}{data.melhoriaTaxaAcerto.toFixed(2)}%
+                  {((data.melhoriaTaxaAcerto ?? 0) > 0 ? '+' : '')}{(data.melhoriaTaxaAcerto ?? 0).toFixed(2)}%
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Aumento na assertividade
@@ -2229,7 +2157,7 @@ export const PostIATab = ({
                   Economia Erros Evitados
                 </h4>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  R$ {data.economiaErrosEvitados.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.economiaErrosEvitados ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Por mês
@@ -2242,7 +2170,7 @@ export const PostIATab = ({
                   Economia de Tempo
                 </h4>
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {data.economiaTempo.toFixed(1)}h
+                  {(data.economiaTempo ?? 0).toFixed(1)}h
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Por mês
@@ -2255,7 +2183,7 @@ export const PostIATab = ({
                   Valor Tempo Economizado
                 </h4>
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  R$ {data.valorTempoEconomizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.valorTempoEconomizado ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Por mês
@@ -2268,7 +2196,7 @@ export const PostIATab = ({
                   Benefício Total
                 </h4>
                 <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                  R$ {data.beneficioTotalMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.beneficioTotalMensal ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Por mês
@@ -2281,7 +2209,7 @@ export const PostIATab = ({
                   ROI da Melhoria
                 </h4>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {data.roiMelhoria > 0 ? '+' : ''}{data.roiMelhoria.toFixed(1)}%
+                  {((data.roiMelhoria ?? 0) > 0 ? '+' : '')}{(data.roiMelhoria ?? 0).toFixed(1)}%
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Retorno anual
@@ -2310,19 +2238,19 @@ export const PostIATab = ({
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Taxa Acerto:</span>
                       <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
-                        {baselineData.taxaAcertoAtual.toFixed(2)}%
+                        {(baselineData.taxaAcertoAtual ?? 0).toFixed(2)}%
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Tempo/Decisão:</span>
                       <span className="ml-2 font-semibold text-slate-900 dark:text-white">
-                        {baselineData.tempoMedioDecisao.toFixed(1)} min
+                        {(baselineData.tempoMedioDecisao ?? 0).toFixed(1)} min
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Custo Erro:</span>
                       <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
-                        R$ {baselineData.custoMedioDecisaoErrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(baselineData.custoMedioDecisaoErrada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
@@ -2342,19 +2270,19 @@ export const PostIATab = ({
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Taxa Acerto:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        {data.taxaAcertoComIA.toFixed(2)}%
+                        {(data.taxaAcertoComIA ?? 0).toFixed(2)}%
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Tempo/Decisão:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        {data.tempoMedioDecisaoComIA.toFixed(1)} min
+                        {(data.tempoMedioDecisaoComIA ?? 0).toFixed(1)} min
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 dark:text-slate-400">Custo Erro:</span>
                       <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
-                        R$ {data.custoMedioDecisaoErradaComIA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {(data.custoMedioDecisaoErradaComIA ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
@@ -2527,7 +2455,7 @@ export const PostIATab = ({
                   Redução Tempo Entrega
                 </h4>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {data.reducaoTempoEntrega.toFixed(1)}%
+                  {(data.reducaoTempoEntrega ?? 0).toFixed(1)}%
                 </p>
               </div>
 
@@ -2536,7 +2464,7 @@ export const PostIATab = ({
                   Aumento Capacidade
                 </h4>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {data.aumentoCapacidade > 0 ? '+' : ''}{data.aumentoCapacidade.toFixed(0)} entregas/mês
+                  {((data.aumentoCapacidade ?? 0) > 0 ? '+' : '')}{(data.aumentoCapacidade ?? 0).toFixed(0)} entregas/mês
                 </p>
               </div>
 
@@ -2545,7 +2473,7 @@ export const PostIATab = ({
                   Economia Atrasos
                 </h4>
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  R$ {data.economiaAtrasos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.economiaAtrasos ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
@@ -2554,7 +2482,7 @@ export const PostIATab = ({
                   Valor Tempo Economizado
                 </h4>
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  R$ {data.valorTempoEconomizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.valorTempoEconomizado ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
@@ -2563,7 +2491,7 @@ export const PostIATab = ({
                   Ganho Produtividade
                 </h4>
                 <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                  {data.ganhoProdutividade > 0 ? '+' : ''}{data.ganhoProdutividade.toFixed(1)}%
+                  {((data.ganhoProdutividade ?? 0) > 0 ? '+' : '')}{(data.ganhoProdutividade ?? 0).toFixed(1)}%
                 </p>
               </div>
 
@@ -2572,7 +2500,7 @@ export const PostIATab = ({
                   ROI Velocidade
                 </h4>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {data.roiVelocidade > 0 ? '+' : ''}{data.roiVelocidade.toFixed(1)}%
+                  {((data.roiVelocidade ?? 0) > 0 ? '+' : '')}{(data.roiVelocidade ?? 0).toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -2588,7 +2516,7 @@ export const PostIATab = ({
               <span className="text-2xl">😊</span>
               Estimativas Pós-IA (Satisfação)
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Score com IA */}
               <div>
@@ -2723,7 +2651,7 @@ export const PostIATab = ({
                   Delta Satisfação
                 </h4>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {data.deltaSatisfacao > 0 ? '+' : ''}{data.deltaSatisfacao.toFixed(1)} pts
+                  {((data.deltaSatisfacao ?? 0) > 0 ? '+' : '')}{(data.deltaSatisfacao ?? 0).toFixed(1)} pts
                 </p>
               </div>
 
@@ -2732,7 +2660,7 @@ export const PostIATab = ({
                   Redução Churn
                 </h4>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {data.reducaoChurn.toFixed(2)}%
+                  {(data.reducaoChurn ?? 0).toFixed(2)}%
                 </p>
               </div>
 
@@ -2741,7 +2669,7 @@ export const PostIATab = ({
                   Valor Retenção
                 </h4>
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  R$ {data.valorRetencao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
+                  R$ {(data.valorRetencao ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
                 </p>
               </div>
 
@@ -2750,7 +2678,7 @@ export const PostIATab = ({
                   Economia Suporte
                 </h4>
                 <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  R$ {data.economiaSuporte.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                  R$ {(data.economiaSuporte ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                 </p>
               </div>
 
@@ -2759,7 +2687,7 @@ export const PostIATab = ({
                   Aumento Revenue
                 </h4>
                 <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                  R$ {data.aumentoRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
+                  R$ {(data.aumentoRevenue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano
                 </p>
               </div>
 
@@ -2768,7 +2696,7 @@ export const PostIATab = ({
                   ROI Satisfação
                 </h4>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {data.roiSatisfacao > 0 ? '+' : ''}{data.roiSatisfacao.toFixed(1)}%
+                  {((data.roiSatisfacao ?? 0) > 0 ? '+' : '')}{(data.roiSatisfacao ?? 0).toFixed(1)}%
                 </p>
               </div>
 
@@ -2777,7 +2705,7 @@ export const PostIATab = ({
                   LTV Incrementado
                 </h4>
                 <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
-                  R$ {data.ltvIncrementado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(data.ltvIncrementado ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -2791,13 +2719,13 @@ export const PostIATab = ({
                 <div>
                   <p className="text-slate-500 dark:text-slate-400">Score</p>
                   <p className="font-semibold text-slate-700 dark:text-slate-300">
-                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? baselineData.scoreAtual.toFixed(1) : '0.00'} → {data.scoreComIA.toFixed(1)}
+                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? (baselineData.scoreAtual ?? 0).toFixed(1) : '0.00'} → {(data.scoreComIA ?? 0).toFixed(1)}
                   </p>
                 </div>
                 <div>
                   <p className="text-slate-500 dark:text-slate-400">Churn</p>
                   <p className="font-semibold text-slate-700 dark:text-slate-300">
-                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? baselineData.taxaChurnAtual.toFixed(2) : '0.00'}% → {data.taxaChurnComIA.toFixed(2)}%
+                    {baselineData && baselineData.tipo === 'SATISFAÇÃO' ? (baselineData.taxaChurnAtual ?? 0).toFixed(2) : '0.00'}% → {(data.taxaChurnComIA ?? 0).toFixed(2)}%
                   </p>
                 </div>
                 <div>
@@ -2945,7 +2873,7 @@ export const PostIATab = ({
                 Aumento na Capacidade
               </p>
               <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData 
+                {baselineData && baselineData.tipo === 'CAPACIDADE ANALÍTICA' && 'camposQualitativos' in baselineData
                   ? `+${data.camposQualitativos.length - baselineData.camposQualitativos.length} novos insights`
                   : `${data.camposQualitativos.length} insights`}
               </p>
