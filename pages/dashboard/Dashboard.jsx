@@ -18,6 +18,7 @@ import VelocidadeCharts from '../../components/dashboard/VelocidadeCharts'
 import SatisfacaoCharts from '../../components/dashboard/SatisfacaoCharts'
 import KPICard from '../../components/dashboard/KPICard'
 import { formatarMoeda, formatarPorcentagem, formatarHoras, formatarPayback, formatarROI } from '../../utils/formatters'
+import { obterNomeIndicador, normalizarTipoIndicador } from '../../utils/indicatorUtils'
 
 const Dashboard = () => {
   const { id } = useParams()
@@ -228,7 +229,7 @@ const Dashboard = () => {
     }
 
     return {
-      labels: indicadoresComMetricas.map(item => item.indicador?.nome || 'Indicador'),
+      labels: indicadoresComMetricas.map(item => obterNomeIndicador(item.indicador) || 'Indicador'),
       datasets: [
         {
           label: 'Tempo Manual (min)',
@@ -257,7 +258,7 @@ const Dashboard = () => {
     }
 
     return {
-      labels: indicadoresComMetricas.map(item => item.indicador?.nome || 'Indicador'),
+      labels: indicadoresComMetricas.map(item => obterNomeIndicador(item.indicador) || 'Indicador'),
       datasets: [
         {
           label: 'Economia Anual (R$)',
@@ -314,7 +315,7 @@ const Dashboard = () => {
           'rgba(236, 72, 153, 0.6)'
         ]
         return {
-          label: item.indicador?.nome || `Indicador ${index + 1}`,
+          label: obterNomeIndicador(item.indicador) || `Indicador ${index + 1}`,
           data: [
             normalizar(Math.abs(m.roiPercentual || 0), maxROI),
             normalizar(Math.abs(m.eficiencia || 0), maxEficiencia),
@@ -630,8 +631,8 @@ const Dashboard = () => {
                 const indicador = item?.indicador || {}
                 if (!m || !indicador) return null
 
-                // Obtém o tipo do indicador
-                const tipoIndicador = indicador.tipoIndicador || indicador.info_data?.tipoIndicador || 'N/A'
+                // Obtém o tipo do indicador suportando formato normalizado e antigo
+                const tipoIndicador = normalizarTipoIndicador(indicador) || indicador.tipoIndicador || indicador.info_data?.tipoIndicador || 'N/A'
                 const tipoNormalizado = tipoIndicador.toUpperCase().replace(/[ÁÀÂÃ]/g, 'A').replace(/[ÉÊ]/g, 'E').replace(/[Í]/g, 'I').replace(/[ÓÔÕ]/g, 'O').replace(/[ÚÛ]/g, 'U')
 
                 // Busca dados de baseline e pós-IA
@@ -730,7 +731,7 @@ const Dashboard = () => {
 
                 return (
                   <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{indicador.nome || 'Indicador'}</td>
+                    <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{obterNomeIndicador(indicador) || 'Indicador'}</td>
                     <td className="py-4 px-4 text-slate-600 dark:text-slate-400">{tipoIndicador}</td>
                     <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaBaseline}</td>
                     <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaPosIA}</td>

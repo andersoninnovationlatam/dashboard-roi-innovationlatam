@@ -3,6 +3,8 @@
  * Calcula métricas específicas para cada tipo de indicador para exibição no Dashboard
  */
 
+import { obterNomeIndicador } from '../utils/indicatorUtils'
+
 /**
  * Converte período para multiplicador mensal
  */
@@ -32,6 +34,54 @@ const toNumber = (value, defaultValue = 0) => {
 }
 
 /**
+ * Normaliza o tipo do indicador - converte improvement_type (formato normalizado) para tipoIndicador (formato antigo)
+ * Suporta ambos os formatos para compatibilidade
+ */
+const normalizarTipoIndicador = (indicador) => {
+  const infoData = indicador.info_data || indicador.infoData || {}
+  const baselineData = indicador.baselineData || indicador.baseline || indicador.baseline_data || {}
+  const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
+  
+  // Primeiro tenta formato antigo (info_data.tipoIndicador)
+  if (infoData.tipoIndicador) {
+    return infoData.tipoIndicador
+  }
+  
+  // Depois tenta baselineData.tipo ou postIAData.tipo
+  if (baselineData.tipo) {
+    return baselineData.tipo
+  }
+  
+  if (postIAData.tipo) {
+    return postIAData.tipo
+  }
+  
+  // Se não encontrou formato antigo, tenta converter improvement_type (formato normalizado)
+  if (indicador.improvement_type) {
+    const tipoMap = {
+      'productivity': 'Produtividade',
+      'analytical_capacity': 'Capacidade Analítica',
+      'revenue_increase': 'Incremento Receita',
+      'cost_reduction': 'Custos Relacionados',
+      // Tipos adicionais que podem existir
+      'risk_reduction': 'Redução de Risco',
+      'decision_quality': 'Qualidade Decisão',
+      'speed': 'Velocidade',
+      'satisfaction': 'Satisfação',
+      'margin_improvement': 'Melhoria Margem'
+    }
+    return tipoMap[indicador.improvement_type] || indicador.improvement_type
+  }
+  
+  // Fallback: tenta tipoIndicador direto no objeto (caso já esteja normalizado)
+  if (indicador.tipoIndicador) {
+    return indicador.tipoIndicador
+  }
+  
+  return null
+}
+
+/**
  * Calcula métricas específicas para indicador do tipo PRODUTIVIDADE
  */
 export const calcularMetricasProdutividade = (indicador) => {
@@ -43,8 +93,8 @@ export const calcularMetricasProdutividade = (indicador) => {
   const infoData = indicador.info_data || indicador.infoData || {}
 
   // Verifica se é tipo PRODUTIVIDADE
-  // Pode estar em infoData.tipoIndicador ou baselineData.tipo
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  // Usa função auxiliar para normalizar tipo (suporta formato antigo e normalizado)
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   
   // Mapeia tipos antigos para novos
   const tipoMapeado = tipoIndicador === 'Produtividade' ? 'PRODUTIVIDADE' : tipoIndicador
@@ -151,7 +201,7 @@ export const calcularMetricasProdutividade = (indicador) => {
 
   return {
     tipo: 'PRODUTIVIDADE',
-    indicadorNome: infoData.nome || indicador.nome || indicador.tipoIndicador || 'Indicador de Produtividade',
+    indicadorNome: obterNomeIndicador(indicador) || indicador.tipoIndicador || 'Indicador de Produtividade',
     // Dados detalhados por pessoa
     horasEconomizadasExecucao,
     custoHorasEconomizadas,
@@ -177,7 +227,8 @@ export const calcularMetricasIncrementoReceita = (indicador) => {
   const infoData = indicador.info_data || indicador.infoData || {}
 
   // Verifica se é tipo INCREMENTO RECEITA
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  // Usa função auxiliar para normalizar tipo (suporta formato antigo e normalizado)
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   
   if (tipoIndicador !== 'Incremento Receita' && baselineData.tipo !== 'INCREMENTO RECEITA' && postIAData.tipo !== 'INCREMENTO RECEITA') {
     return null
@@ -189,7 +240,7 @@ export const calcularMetricasIncrementoReceita = (indicador) => {
 
   return {
     tipo: 'INCREMENTO RECEITA',
-    indicadorNome: infoData.nome || indicador.nome || indicador.tipoIndicador || 'Indicador de Incremento de Receita',
+    indicadorNome: obterNomeIndicador(indicador) || indicador.tipoIndicador || 'Indicador de Incremento de Receita',
     valorReceitaAntes,
     valorReceitaDepois,
     deltaReceita
@@ -206,7 +257,8 @@ export const calcularMetricasCapacidadeAnalitica = (indicador) => {
   const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  // Usa função auxiliar para normalizar tipo (suporta formato antigo e normalizado)
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   
   if (tipoIndicador !== 'Capacidade Analítica') {
     return null
@@ -220,7 +272,7 @@ export const calcularMetricasCapacidadeAnalitica = (indicador) => {
 
   return {
     tipo: 'CAPACIDADE ANALÍTICA',
-    nome: infoData.nome || indicador.nome || 'Capacidade Analítica',
+    nome: obterNomeIndicador(indicador) || 'Capacidade Analítica',
     quantidadeAnalisesAntes,
     quantidadeAnalisesDepois,
     aumentoCapacidade: Math.round(aumentoCapacidade * 100) / 100
@@ -237,7 +289,8 @@ export const calcularMetricasMelhoriaMargem = (indicador) => {
   const postIAData = indicador.postIAData || indicador.postIA || indicador.post_ia_data || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  // Usa função auxiliar para normalizar tipo (suporta formato antigo e normalizado)
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Melhoria Margem' ? 'MELHORIA MARGEM' : tipoIndicador
   
   if (tipoMapeado !== 'MELHORIA MARGEM' && baselineData.tipo !== 'MELHORIA MARGEM' && postIAData.tipo !== 'MELHORIA MARGEM') {
@@ -295,7 +348,7 @@ export const calcularMetricasMelhoriaMargem = (indicador) => {
 
   return {
     tipo: 'MELHORIA MARGEM',
-    nome: infoData.nome || indicador.nome || 'Melhoria de Margem',
+    nome: obterNomeIndicador(indicador) || 'Melhoria de Margem',
     
     // Dados Baseline
     receitaBrutaMensal,
@@ -333,13 +386,14 @@ export const calcularMetricasReducaoRisco = (indicador) => {
   const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Redução de Risco' ? 'REDUÇÃO DE RISCO' : tipoIndicador
   
   console.log('🔍 Debug Redução de Risco:', {
-    nome: infoData.nome || indicador.nome,
+    nome: obterNomeIndicador(indicador),
     tipoIndicador,
     tipoMapeado,
+    improvement_type: indicador.improvement_type,
     baselineTipo: baselineData.tipo,
     postIATipo: postIAData.tipo
   })
@@ -391,7 +445,7 @@ export const calcularMetricasReducaoRisco = (indicador) => {
 
   const resultado = {
     tipo: 'REDUÇÃO DE RISCO',
-    nome: infoData.nome || indicador.nome || 'Redução de Risco',
+    nome: obterNomeIndicador(indicador) || 'Redução de Risco',
     
     // Dados Baseline
     probabilidadeAtual,
@@ -438,13 +492,14 @@ export const calcularMetricasQualidadeDecisao = (indicador) => {
   const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Qualidade Decisão' ? 'QUALIDADE DECISÃO' : tipoIndicador
   
   console.log('🔍 Debug Qualidade Decisão:', {
-    nome: infoData.nome || indicador.nome,
+    nome: obterNomeIndicador(indicador),
     tipoIndicador,
     tipoMapeado,
+    improvement_type: indicador.improvement_type,
     baselineTipo: baselineData.tipo,
     postIATipo: postIAData.tipo
   })
@@ -510,7 +565,7 @@ export const calcularMetricasQualidadeDecisao = (indicador) => {
 
   const resultado = {
     tipo: 'QUALIDADE DECISÃO',
-    nome: infoData.nome || indicador.nome || 'Qualidade de Decisão',
+    nome: obterNomeIndicador(indicador) || 'Qualidade de Decisão',
     
     // Dados Baseline
     numeroDecisoesPeriodo,
@@ -566,13 +621,14 @@ export const calcularMetricasVelocidade = (indicador) => {
   const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Velocidade' ? 'VELOCIDADE' : tipoIndicador
   
   console.log('🔍 Debug Velocidade:', {
-    nome: infoData.nome || indicador.nome,
+    nome: obterNomeIndicador(indicador),
     tipoIndicador,
     tipoMapeado,
+    improvement_type: indicador.improvement_type,
     baselineTipo: baselineData.tipo,
     postIATipo: postIAData.tipo
   })
@@ -647,7 +703,7 @@ export const calcularMetricasVelocidade = (indicador) => {
 
   const resultado = {
     tipo: 'VELOCIDADE',
-    nome: infoData.nome || indicador.nome || 'Velocidade',
+    nome: obterNomeIndicador(indicador) || 'Velocidade',
     
     // Baseline
     tempoMedioEntregaAtual,
@@ -703,13 +759,14 @@ export const calcularMetricasSatisfacao = (indicador) => {
   const postIAData = indicador.post_ia_data || indicador.postIAData || indicador.postIA || {}
   const infoData = indicador.info_data || indicador.infoData || {}
 
-  const tipoIndicador = infoData.tipoIndicador || baselineData.tipo || postIAData.tipo
+  const tipoIndicador = normalizarTipoIndicador(indicador)
   const tipoMapeado = tipoIndicador === 'Satisfação' ? 'SATISFAÇÃO' : tipoIndicador
   
   console.log('🔍 Debug Satisfação:', {
-    nome: infoData.nome || indicador.nome,
+    nome: obterNomeIndicador(indicador),
     tipoIndicador,
     tipoMapeado,
+    improvement_type: indicador.improvement_type,
     baselineTipo: baselineData.tipo,
     postIATipo: postIAData.tipo
   })
@@ -776,7 +833,7 @@ export const calcularMetricasSatisfacao = (indicador) => {
 
   const resultado = {
     tipo: 'SATISFAÇÃO',
-    nome: infoData.nome || indicador.nome || 'Satisfação',
+    nome: obterNomeIndicador(indicador) || 'Satisfação',
     
     // Baseline
     scoreAtual,

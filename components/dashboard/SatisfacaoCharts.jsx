@@ -41,7 +41,7 @@ const SatisfacaoCharts = ({ metricas }) => {
     const scoreDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       scoreAntes.push(metrica.scoreAtual || 0)
       scoreDepois.push(metrica.scoreComIA || 0)
     })
@@ -70,7 +70,7 @@ const SatisfacaoCharts = ({ metricas }) => {
     const churnDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       churnAntes.push(metrica.taxaChurnAtual || 0)
       churnDepois.push(metrica.taxaChurnComIA || 0)
     })
@@ -100,7 +100,7 @@ const SatisfacaoCharts = ({ metricas }) => {
     const revenue = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       retencao.push(metrica.valorRetencao || 0)
       suporte.push((metrica.economiaSuporte || 0) * 12)  // Anualizado
       revenue.push(metrica.aumentoRevenue || 0)
@@ -309,7 +309,7 @@ const SatisfacaoCharts = ({ metricas }) => {
             <tbody>
               {metricas.map((metrica, index) => (
                 <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.nome || 'Indicador'}</td>
+                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.name || metrica.nome || 'Indicador'}</td>
                   <td className="py-3 px-3 text-right text-green-600 dark:text-green-400 font-semibold">
                     {metrica.deltaSatisfacao > 0 ? '+' : ''}{metrica.deltaSatisfacao?.toFixed(1)}
                   </td>

@@ -37,7 +37,7 @@ const ReducaoRiscoCharts = ({ metricas }) => {
     const probabilidadeDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       reducaoProbabilidade.push(metrica.reducaoProbabilidade || 0)
       probabilidadeAntes.push(metrica.probabilidadeAtual || 0)
       probabilidadeDepois.push(metrica.probabilidadeComIA || 0)
@@ -69,7 +69,7 @@ const ReducaoRiscoCharts = ({ metricas }) => {
     const economiaMitigacaoAnual = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       valorRiscoEvitado.push(metrica.valorRiscoEvitado || 0)
       economiaMitigacaoAnual.push((metrica.economiaMitigacao || 0) * 12)
     })
@@ -98,7 +98,7 @@ const ReducaoRiscoCharts = ({ metricas }) => {
     const custoVsBeneficio = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       roi.push(metrica.roiReducaoRisco || 0)
       custoVsBeneficio.push(metrica.custoVsBeneficio || 0)
     })
@@ -296,7 +296,7 @@ const ReducaoRiscoCharts = ({ metricas }) => {
             <tbody>
               {metricas.map((metrica, index) => (
                 <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.nome || 'Indicador'}</td>
+                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.name || metrica.nome || 'Indicador'}</td>
                   <td className="py-3 px-3 text-right text-green-600 dark:text-green-400 font-semibold">
                     {metrica.reducaoProbabilidade > 0 ? '-' : ''}{Math.abs(metrica.reducaoProbabilidade || 0).toFixed(2)}%
                   </td>

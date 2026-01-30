@@ -104,26 +104,21 @@ export const AuthProvider = ({ children }) => {
           fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:100',message:'onAuthStateChange EVENT',data:{event:event,hasNewUser:!!newUser,newUserId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
           // #endregion
           
-          console.log('🔐 Auth event:', event)
-          
-          // CORREÇÃO: Ignora INITIAL_SESSION para evitar logs desnecessários
+          // CORREÇÃO: Não atualiza INITIAL_SESSION se já temos usuário com mesmo ID
           if (event === 'INITIAL_SESSION') {
-            // Apenas atualiza o usuário sem log adicional
-            if (newUser) {
+            // Só atualiza se não temos usuário ou se o ID mudou
+            if (newUser && newUser.id !== userRef.current?.id) {
               setUser(newUser)
             }
             return
           }
           
           if (event === 'SIGNED_OUT') {
-            console.log('🚪 Usuário deslogado')
             setUser(null)
           } else if (event === 'SIGNED_IN') {
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:120',message:'onAuthStateChange SIGNED_IN - BEFORE setUser',data:{userId:newUser?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
             // #endregion
-            
-            console.log('✅ Usuário logado - setUser chamado')
             
             // CORREÇÃO: Buscar dados completos do usuário e atualizar
             if (newUser?.id) {
@@ -160,18 +155,23 @@ export const AuthProvider = ({ children }) => {
             fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:148',message:'onAuthStateChange SIGNED_IN - AFTER setUser',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
             // #endregion
           } else if (event === 'TOKEN_REFRESHED') {
-            // CRÍTICO: Só atualiza se o ID do usuário realmente mudou
-            // Evita re-renders desnecessários quando apenas o token é renovado
-            if (newUser?.id !== user?.id) {
-              console.log('🔄 [AuthContext] Token renovado - ID mudou, atualizando estado')
-              setUser(newUser)
-            } else {
-              // Token renovado mas usuário é o mesmo - não atualiza para evitar re-renders
-              console.log('🔄 [AuthContext] Token renovado - mesmo usuário, ignorando atualização')
-            }
+            // CORREÇÃO CRÍTICA: Ignora completamente TOKEN_REFRESHED - apenas token mudou
+            // O callback já retorna dados básicos sem getById(), então não precisamos atualizar estado
+            // Isso evita re-renders desnecessários e timeouts repetidos
+            return
           } else if (event === 'USER_UPDATED') {
-            console.log('📝 Usuário atualizado')
-            setUser(newUser)
+            // CORREÇÃO: Só atualiza se realmente mudou algo relevante
+            if (newUser && newUser.id === userRef.current?.id) {
+              const currentUser = userRef.current
+              // Compara campos relevantes antes de atualizar
+              if (newUser.email !== currentUser?.email || 
+                  newUser.organization_id !== currentUser?.organization_id ||
+                  newUser.role !== currentUser?.role) {
+                setUser(newUser)
+              }
+            } else {
+              setUser(newUser)
+            }
           } else if (event === 'USER_DELETED') {
             // CRÍTICO: Usuário foi deletado do Supabase
             console.error('🗑️ USUÁRIO DELETADO - Fazendo logout imediato e limpando sessão')
@@ -311,7 +311,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const canDeleteProject = () => {
-    return hasRole('admin')
+    return hasAnyRole(['admin', 'manager'])
   }
 
   const canCreateIndicator = () => {

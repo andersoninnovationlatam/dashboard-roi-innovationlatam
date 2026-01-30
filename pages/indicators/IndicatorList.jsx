@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useLocation } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Loading from '../../components/common/Loading'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { obterNomeIndicador, normalizarTipoIndicador, obterDescricaoIndicador } from '../../utils/indicatorUtils'
 
 const IndicatorList = () => {
   const { id } = useParams()
+  const location = useLocation()
   const { getProjectById, getIndicatorsByProjectId, deleteIndicator, loading } = useData()
   
   const project = getProjectById(id)
@@ -17,6 +19,7 @@ const IndicatorList = () => {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Carrega indicadores de forma assíncrona
+  // Recarrega quando id muda ou quando volta para esta página (location.key muda)
   useEffect(() => {
     const loadIndicators = async () => {
       if (!id) {
@@ -39,7 +42,7 @@ const IndicatorList = () => {
     }
 
     loadIndicators()
-  }, [id, getIndicatorsByProjectId])
+  }, [id, getIndicatorsByProjectId, location.key])
 
   const handleDeleteClick = (e, indicatorId) => {
     e.preventDefault()
@@ -78,8 +81,7 @@ const IndicatorList = () => {
   const getIndicatorName = (indicatorId) => {
     const indicator = indicators.find(ind => ind.id === indicatorId)
     if (!indicator) return 'este indicador'
-    const infoData = indicator.info_data || {}
-    return indicator.nome || infoData.nome || 'este indicador'
+    return obterNomeIndicador(indicator) || 'este indicador'
   }
 
   if (loading || indicatorsLoading) {
@@ -136,11 +138,10 @@ const IndicatorList = () => {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {indicators.map((indicator) => {
-            // Extrai nome e tipoIndicador do info_data se necessário
-            const infoData = indicator.info_data || {}
-            const nome = indicator.nome || infoData.nome || 'Indicador sem nome'
-            const tipoIndicador = indicator.tipoIndicador || infoData.tipoIndicador
-            const descricao = indicator.descricao || infoData.descricao
+            // Extrai nome, tipo e descrição suportando formato normalizado e antigo
+            const nome = obterNomeIndicador(indicator)
+            const tipoIndicador = normalizarTipoIndicador(indicator) || indicator.tipoIndicador || (indicator.info_data || {}).tipoIndicador
+            const descricao = obterDescricaoIndicador(indicator)
 
             return (
               <div key={indicator.id} className="relative group">

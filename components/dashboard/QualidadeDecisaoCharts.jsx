@@ -33,7 +33,7 @@ const QualidadeDecisaoCharts = ({ metricas }) => {
     const taxaDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       taxaAntes.push(metrica.taxaAcertoAtual || 0)
       taxaDepois.push(metrica.taxaAcertoComIA || 0)
     })
@@ -62,7 +62,7 @@ const QualidadeDecisaoCharts = ({ metricas }) => {
     const valorTempo = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       economiaErros.push(metrica.economiaErrosEvitados || 0)
       valorTempo.push(metrica.valorTempoEconomizado || 0)
     })
@@ -91,7 +91,7 @@ const QualidadeDecisaoCharts = ({ metricas }) => {
     const roi = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       beneficio.push(metrica.beneficioTotalMensal || 0)
       roi.push(metrica.roiMelhoria || 0)
     })
@@ -289,7 +289,7 @@ const QualidadeDecisaoCharts = ({ metricas }) => {
             <tbody>
               {metricas.map((metrica, index) => (
                 <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.nome || 'Indicador'}</td>
+                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.name || metrica.nome || 'Indicador'}</td>
                   <td className="py-3 px-3 text-right text-green-600 dark:text-green-400 font-semibold">
                     {metrica.melhoriaTaxaAcerto > 0 ? '+' : ''}{metrica.melhoriaTaxaAcerto?.toFixed(2)}%
                   </td>

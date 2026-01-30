@@ -13,19 +13,17 @@ import CustoForm from '../../components/indicators/CustoForm'
 import { BaselineTab } from '../../src/features/projects/BaselineTab'
 import { PostIATab } from '../../src/features/projects/PostIATab'
 import { TIPOS_INDICADOR, CAMPOS_POR_TIPO } from '../../config/indicatorTypes'
+import { normalizarTipoIndicador } from '../../utils/indicatorUtils'
 
 const IndicatorForm = () => {
-  console.log('📝 [IndicatorForm] Componente renderizado')
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
-  const { getProjectById, getIndicatorById } = useData()
+  const { getProjectById, getIndicatorById, updateIndicator, createIndicator } = useData()
   const { user } = useAuth()
 
   // Memoiza project para evitar re-renders desnecessários
   const project = useMemo(() => getProjectById(id), [getProjectById, id])
   const isEditing = !!indicatorId
-
-  console.log('📝 [IndicatorForm] Props:', { id, indicatorId, isEditing, projectId: project?.id })
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -52,28 +50,36 @@ const IndicatorForm = () => {
   const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
-    console.log('📝 [IndicatorForm] useEffect loadIndicatorData executado - isEditing:', isEditing, 'indicatorId:', indicatorId, 'dataLoaded:', dataLoaded)
-
     // Evita recarregar dados se já foram carregados para este indicador
     if (dataLoaded && isEditing && indicatorId) {
-      console.log('📝 [IndicatorForm] Dados já carregados, ignorando...')
       return
     }
 
     const loadIndicatorData = async () => {
       if (isEditing && indicatorId) {
-        console.log('📝 [IndicatorForm] Carregando dados do indicador:', indicatorId)
         try {
           const completeIndicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
 
           if (completeIndicator) {
-            console.log('📝 [IndicatorForm] Indicador carregado, atualizando formData')
-            // Carrega dados do Supabase
-            const infoData = completeIndicator.nome ? {
-              nome: completeIndicator.nome,
-              tipoIndicador: completeIndicator.tipoIndicador,
-              descricao: completeIndicator.descricao,
-              camposEspecificos: completeIndicator.camposEspecificos
+            // Debug: Log para verificar dados recebidos
+            console.log('🔍 IndicatorForm - Dados recebidos do getCompleteById:', {
+              completeIndicator,
+              baselineData: completeIndicator.baselineData,
+              postIAData: completeIndicator.postIAData,
+              personsBaseline: completeIndicator.persons_baseline,
+              personsPostIA: completeIndicator.persons_post_ia
+            })
+
+            // Carrega dados do Supabase suportando formato normalizado e antigo
+            const nome = completeIndicator.name || completeIndicator.nome
+            const tipoIndicador = normalizarTipoIndicador(completeIndicator) || completeIndicator.tipoIndicador
+            const descricao = completeIndicator.description || completeIndicator.descricao
+
+            const infoData = nome ? {
+              nome: nome,
+              tipoIndicador: tipoIndicador,
+              descricao: descricao,
+              camposEspecificos: completeIndicator.camposEspecificos || {}
             } : null
 
             // Normaliza pessoas do baseline para compatibilidade
@@ -88,7 +94,12 @@ const IndicatorForm = () => {
               periodoOperacoesTotal: pessoa.periodoOperacoesTotal || 'dias'
             }))
 
-            console.log('📝 [IndicatorForm] setFormData chamado - atualizando formulário')
+            console.log('🔍 IndicatorForm - Dados processados:', {
+              pessoasBaselineCount: pessoasBaseline.length,
+              baselineData: completeIndicator.baselineData,
+              postIAData: completeIndicator.postIAData
+            })
+
             setFormData({
               nome: infoData?.nome || '',
               tipoIndicador: infoData?.tipoIndicador || 'Produtividade',
@@ -107,10 +118,8 @@ const IndicatorForm = () => {
               },
               custos: completeIndicator.custos || []
             })
-            console.log('📝 [IndicatorForm] formData atualizado com sucesso')
             setDataLoaded(true) // Marca como carregado
           } else {
-            console.warn('Indicador não encontrado no Supabase')
             setDataLoaded(true) // Marca como carregado mesmo se não encontrado
           }
         } catch (error) {
@@ -520,9 +529,9 @@ const IndicatorForm = () => {
 
       const postIADataToSave = formData.postIAData || {}
 
-      // Cria ou atualiza no Supabase
+      // Cria ou atualiza no Supabase usando métodos do contexto (atualiza estado global)
       if (shouldCreateNew) {
-        const createResult = await indicatorServiceSupabase.create({
+        const createResult = await createIndicator({
           projectId: id,
           info_data: infoData,
           baseline_data: baselineDataToSave,
@@ -542,7 +551,7 @@ const IndicatorForm = () => {
           console.warn('Indicador com ID inválido foi recriado no Supabase com novo UUID')
         }
       } else {
-        const updateResult = await indicatorServiceSupabase.update(indicatorId, {
+        const updateResult = await updateIndicator(indicatorId, {
           info_data: infoData,
           baseline_data: baselineDataToSave,
           ia_data: iaData,

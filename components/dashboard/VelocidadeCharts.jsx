@@ -37,7 +37,7 @@ const VelocidadeCharts = ({ metricas }) => {
     const tempoDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       
       // Converter para horas para padronização
       const tempoAntesHoras = metrica.unidadeTempoEntrega === 'dias' 
@@ -76,7 +76,7 @@ const VelocidadeCharts = ({ metricas }) => {
     const capacidadeDepois = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       capacidadeAntes.push(metrica.entregasMensalBaseline || 0)
       capacidadeDepois.push(metrica.entregasMensalComIA || 0)
     })
@@ -105,7 +105,7 @@ const VelocidadeCharts = ({ metricas }) => {
     const valorTempo = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       economiaAtrasos.push(metrica.economiaAtrasos || 0)
       valorTempo.push(metrica.valorTempoEconomizado || 0)
     })
@@ -307,7 +307,7 @@ const VelocidadeCharts = ({ metricas }) => {
             <tbody>
               {metricas.map((metrica, index) => (
                 <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.nome || 'Indicador'}</td>
+                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.name || metrica.nome || 'Indicador'}</td>
                   <td className="py-3 px-3 text-right text-green-600 dark:text-green-400 font-semibold">
                     {metrica.reducaoTempoEntrega?.toFixed(1)}%
                   </td>
