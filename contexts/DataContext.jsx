@@ -31,7 +31,7 @@ export const DataProvider = ({ children }) => {
     try {
       // CRÍTICO: Valida sessão antes de carregar dados
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
+
       if (sessionError || !session) {
         console.warn('🔒 Sessão inválida detectada ao carregar dados')
         setProjects([])
@@ -49,20 +49,20 @@ export const DataProvider = ({ children }) => {
       const [projectsData, indicatorsData, orgData] = await Promise.all([
         projectServiceSupabase.getAll(),
         indicatorServiceSupabase.getAll(),
-        user?.organization_id 
+        user?.organization_id
           ? organizationServiceSupabase.getById(user.organization_id)
           : Promise.resolve(null)
       ])
 
       setProjects(projectsData || [])
       setIndicators(indicatorsData || [])
-      
+
       if (orgData) {
         setOrganizations([orgData])
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
-      
+
       // Se erro de autenticação, limpa tudo e faz logout
       const errorMsg = error.message?.toLowerCase() || ''
       if (
@@ -89,7 +89,7 @@ export const DataProvider = ({ children }) => {
     }
   }, [user, logout])
 
-  // CRÍTICO: Revalida dados e sessão periodicamente
+  // Carrega dados inicialmente e configura subscriptions real-time
   useEffect(() => {
     if (!user?.id) {
       setProjects([])
@@ -118,12 +118,12 @@ export const DataProvider = ({ children }) => {
     // Validação adicional: verifica se usuário está autenticado
     if (!user?.id) {
       console.warn('createProject: usuário não autenticado no contexto')
-      return { 
-        success: false, 
-        error: 'Usuário não autenticado. Por favor, aguarde ou faça login novamente.' 
+      return {
+        success: false,
+        error: 'Usuário não autenticado. Por favor, aguarde ou faça login novamente.'
       }
     }
-    
+
     const result = await projectServiceSupabase.create(data)
     if (result.success) {
       await loadData()
@@ -161,7 +161,7 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
-    
+
     const result = await indicatorServiceSupabase.create(data)
     if (result.success && result.indicator) {
       console.log('📊 [DataContext] Indicador criado, atualizando estado localmente:', result.indicator.id)
@@ -181,7 +181,7 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
-    
+
     const result = await indicatorServiceSupabase.update(id, data)
     if (result.success && result.indicator) {
       console.log('📊 [DataContext] Indicador atualizado, atualizando estado localmente:', id)
@@ -200,7 +200,7 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
-    
+
     const result = await indicatorServiceSupabase.delete(id)
     if (result.success) {
       // Remove do estado localmente em vez de recarregar tudo
@@ -219,7 +219,7 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) {
       return []
     }
-    
+
     try {
       const supabaseIndicators = await indicatorServiceSupabase.getByProjectId(projectId)
       return supabaseIndicators || []
@@ -234,7 +234,7 @@ export const DataProvider = ({ children }) => {
     if (!user?.id) {
       return null
     }
-    
+
     try {
       const completeIndicator = await indicatorServiceSupabase.getCompleteById(id)
       console.log('📊 [DataContext] Indicador encontrado:', completeIndicator ? 'SIM' : 'NÃO')
