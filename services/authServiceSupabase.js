@@ -286,24 +286,23 @@ export const authServiceSupabase = {
         return null
       }
 
-      // OTIMIZAÇÃO: Não força refresh após login recente
-      // Apenas busca dados do usuário na tabela users
+      // OTIMIZAÇÃO: Busca dados do usuário de forma não-bloqueante
+      // Se timeout ou erro, retorna dados básicos da sessão
       let userRecord = null
       try {
-        // Timeout reduzido para 3s (query simples)
+        // Timeout reduzido para 2s e não bloqueia
         const userPromise = userServiceSupabase.getById(user.id)
         const userTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 3000)
+          setTimeout(() => reject(new Error('Timeout')), 2000)
         )
         
         userRecord = await Promise.race([userPromise, userTimeout])
       } catch (userError) {
         // Não é crítico - continua sem dados da tabela users
-        // Isso pode acontecer se RLS bloquear ou tabela não existir
-        // Não loga como erro para não poluir console
+        // Retorna dados básicos da sessão que são suficientes
       }
       
-      // Retorna dados validados
+      // Retorna dados validados (com dados da tabela users se disponível)
       return {
         id: user.id,
         email: user.email,
@@ -372,8 +371,19 @@ export const authServiceSupabase = {
         }
 
         if (session?.user) {
-          // Buscar dados completos do usuário apenas em eventos importantes
-          const userRecord = await userServiceSupabase.getById(session.user.id)
+          // OTIMIZAÇÃO: Buscar dados do usuário com timeout curto e não-bloqueante
+          // Se timeout, retorna dados básicos da sessão (suficiente para funcionar)
+          let userRecord = null
+          try {
+            const userPromise = userServiceSupabase.getById(session.user.id)
+            const userTimeout = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 2000)
+            )
+            userRecord = await Promise.race([userPromise, userTimeout])
+          } catch (error) {
+            // Timeout ou erro - não é crítico, usa dados básicos
+            userRecord = null
+          }
           
           const userData = {
             id: session.user.id,
@@ -383,6 +393,8 @@ export const authServiceSupabase = {
             role: userRecord?.role || 'viewer',
             created_at: session.user.created_at
           }
+          
+          // Chama callback apenas uma vez com dados disponíveis
           callback(userData, event)
         } else {
           callback(null, event)

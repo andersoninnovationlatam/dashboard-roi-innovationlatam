@@ -213,10 +213,30 @@ const Dashboard = () => {
       return { labels: [], datasets: [] }
     }
 
-    const indicadoresComMetricas = metricas.indicadoresDetalhados.filter(item => item && item.metricas)
+    const indicadoresComMetricas = metricas.indicadoresDetalhados.filter(item => {
+      if (!item || !item.indicador) return false
+      const tipoIndicador = normalizarTipoIndicador(item.indicador) || item.indicador.tipoIndicador || ''
+      return tipoIndicador === 'Produtividade'
+    })
 
     if (indicadoresComMetricas.length === 0) {
       return { labels: [], datasets: [] }
+    }
+
+    // Calcula tempos a partir dos dados reais do indicador
+    const calcularTempoMedio = (indicador, isBaseline) => {
+      const persons = isBaseline
+        ? (indicador.persons_baseline || indicador.baselineData?.pessoas || indicador.baseline?.pessoas || [])
+        : (indicador.persons_post_ia || indicador.postIAData?.pessoas || indicador.postIA?.pessoas || [])
+
+      if (persons.length === 0) return 0
+
+      const tempoTotal = persons.reduce((total, pessoa) => {
+        const tempoMinutos = pessoa.time_spent_minutes || pessoa.tempoGasto || 0
+        return total + (parseFloat(tempoMinutos) || 0)
+      }, 0)
+
+      return tempoTotal / persons.length
     }
 
     return {
@@ -224,12 +244,12 @@ const Dashboard = () => {
       datasets: [
         {
           label: 'Tempo Manual (min)',
-          data: indicadoresComMetricas.map(item => item.metricas?.tempoBaselineMinutos || 0),
+          data: indicadoresComMetricas.map(item => calcularTempoMedio(item.indicador, true)),
           backgroundColor: 'rgba(239, 68, 68, 0.8)'
         },
         {
           label: 'Tempo com IA (min)',
-          data: indicadoresComMetricas.map(item => item.metricas?.tempoComIAMinutos || 0),
+          data: indicadoresComMetricas.map(item => calcularTempoMedio(item.indicador, false)),
           backgroundColor: 'rgba(34, 197, 94, 0.8)'
         }
       ]
@@ -335,7 +355,7 @@ const Dashboard = () => {
     )
   }
 
-  if (indicators.length === 0) {
+  if (indicators.length === 0 || completeIndicators.length === 0) {
     return (
       <Card>
         <div className="text-center py-16">
@@ -357,8 +377,22 @@ const Dashboard = () => {
     )
   }
 
-  if (!metricas) {
-    return <Loading />
+  if (!metricas || !metricas.indicadoresDetalhados || metricas.indicadoresDetalhados.length === 0) {
+    return (
+      <Card>
+        <div className="text-center py-16">
+          <div className="w-20 h-20 bg-gradient-to-br from-yellow-500/20 to-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="fas fa-hourglass-half text-4xl text-yellow-500 dark:text-yellow-400"></i>
+          </div>
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+            Calculando métricas...
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400">
+            Aguarde enquanto processamos os dados dos indicadores
+          </p>
+        </div>
+      </Card>
+    )
   }
 
   return (
@@ -630,88 +664,181 @@ const Dashboard = () => {
                 const baselineData = indicador.baselineData || indicador.baseline || indicador.baseline_data || {}
                 const postIAData = indicador.postIAData || indicador.post_ia_data || indicador.postIA || {}
 
+                // Função helper para obter unidade de medida baseada no tipo de indicador
+                const obterUnidadeMedida = (tipo) => {
+                  switch (tipo) {
+                    case 'PRODUTIVIDADE':
+                      return 'min'
+                    case 'INCREMENTO RECEITA':
+                      return 'R$'
+                    case 'CAPACIDADE ANALITICA':
+                    case 'CAPACIDADE ANALÍTICA':
+                      return 'análises'
+                    case 'MELHORIA MARGEM':
+                      return '%'
+                    case 'REDUCAO DE RISCO':
+                    case 'REDUÇÃO DE RISCO':
+                      return '%'
+                    case 'QUALIDADE DECISAO':
+                    case 'QUALIDADE DECISÃO':
+                      return '%'
+                    case 'VELOCIDADE':
+                      return baselineData.unidadeTempoEntrega || 'dias'
+                    case 'SATISFACAO':
+                    case 'SATISFAÇÃO':
+                      return baselineData.tipoScore || 'NPS'
+                    default:
+                      return indicador.metric_unit || m.metric_unit || 'unidades'
+                  }
+                }
+
+                // Função helper para formatar valor com unidade de medida
+                const formatarValorComUnidade = (valor, tipo, unidade) => {
+                  if (!valor || valor === 0) return '-'
+
+                  switch (tipo) {
+                    case 'INCREMENTO RECEITA':
+                      return formatarMoeda(valor)
+                    case 'MELHORIA MARGEM':
+                    case 'REDUCAO DE RISCO':
+                    case 'REDUÇÃO DE RISCO':
+                    case 'QUALIDADE DECISAO':
+                    case 'QUALIDADE DECISÃO':
+                      return `${formatarPorcentagem(valor)}`
+                    case 'VELOCIDADE':
+                      return `${valor} ${unidade}`
+                    case 'SATISFACAO':
+                    case 'SATISFAÇÃO':
+                      return `${valor} ${unidade}`
+                    case 'CAPACIDADE ANALITICA':
+                    case 'CAPACIDADE ANALÍTICA':
+                      return `${valor} ${unidade}`
+                    case 'PRODUTIVIDADE':
+                      return `${Math.round(valor)} ${unidade}`
+                    default:
+                      return `${valor} ${unidade}`
+                  }
+                }
+
                 // Função helper para determinar métricas baseado no tipo
                 const obterMetricasPorTipo = () => {
+                  const unidade = obterUnidadeMedida(tipoNormalizado)
                   let metricaBaseline = '-'
                   let metricaPosIA = '-'
 
                   switch (tipoNormalizado) {
                     case 'PRODUTIVIDADE':
-                      // Tempo Manual | Tempo IA
-                      if (m.tempoBaselineMinutos > 0 || m.tempoComIAMinutos > 0) {
-                        metricaBaseline = `${Math.round(m.tempoBaselineMinutos || 0)} min`
-                        metricaPosIA = `${Math.round(m.tempoComIAMinutos || 0)} min`
+                      // Calcula tempo médio a partir das pessoas do baseline e pós-IA
+                      const personsBaseline = indicador.persons_baseline || baselineData.pessoas || []
+                      const personsPostIA = indicador.persons_post_ia || postIAData.pessoas || []
+
+                      // Calcula tempo total em minutos para baseline
+                      const tempoTotalBaseline = personsBaseline.reduce((total, pessoa) => {
+                        const tempoMinutos = pessoa.time_spent_minutes || pessoa.tempoGasto || 0
+                        return total + (parseFloat(tempoMinutos) || 0)
+                      }, 0)
+
+                      // Calcula tempo total em minutos para pós-IA
+                      const tempoTotalPostIA = personsPostIA.reduce((total, pessoa) => {
+                        const tempoMinutos = pessoa.time_spent_minutes || pessoa.tempoGasto || 0
+                        return total + (parseFloat(tempoMinutos) || 0)
+                      }, 0)
+
+                      // Calcula média se houver pessoas
+                      const tempoMedioBaseline = personsBaseline.length > 0 ? tempoTotalBaseline / personsBaseline.length : tempoTotalBaseline
+                      const tempoMedioPostIA = personsPostIA.length > 0 ? tempoTotalPostIA / personsPostIA.length : tempoTotalPostIA
+
+                      if (tempoMedioBaseline > 0 || tempoMedioPostIA > 0) {
+                        metricaBaseline = formatarValorComUnidade(tempoMedioBaseline, tipoNormalizado, unidade)
+                        metricaPosIA = formatarValorComUnidade(tempoMedioPostIA, tipoNormalizado, unidade)
                       }
                       break
 
                     case 'INCREMENTO RECEITA':
-                      // Receita Antes | Receita Depois
                       const receitaAntes = baselineData.valorReceitaAntes || 0
                       const receitaDepois = postIAData.valorReceitaDepois || 0
-                      metricaBaseline = receitaAntes > 0 ? formatarMoeda(receitaAntes) : '-'
-                      metricaPosIA = receitaDepois > 0 ? formatarMoeda(receitaDepois) : '-'
+                      metricaBaseline = formatarValorComUnidade(receitaAntes, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(receitaDepois, tipoNormalizado, unidade)
                       break
 
                     case 'CAPACIDADE ANALITICA':
                     case 'CAPACIDADE ANALÍTICA':
-                      // Quantidade Análises Antes | Quantidade Análises Depois
                       const qtdAnalisesAntes = baselineData.quantidadeAnalises || 0
                       const qtdAnalisesDepois = postIAData.quantidadeAnalises || 0
-                      metricaBaseline = qtdAnalisesAntes > 0 ? `${qtdAnalisesAntes} análises` : '-'
-                      metricaPosIA = qtdAnalisesDepois > 0 ? `${qtdAnalisesDepois} análises` : '-'
+                      metricaBaseline = formatarValorComUnidade(qtdAnalisesAntes, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(qtdAnalisesDepois, tipoNormalizado, unidade)
                       break
 
                     case 'MELHORIA MARGEM':
-                      // Margem Bruta Atual (%) | Margem Bruta Estimada (%)
                       const margemAtual = baselineData.margemBrutaAtual || 0
                       const margemEstimada = postIAData.margemBrutaEstimada || 0
-                      metricaBaseline = margemAtual > 0 ? `${formatarPorcentagem(margemAtual)}` : '-'
-                      metricaPosIA = margemEstimada > 0 ? `${formatarPorcentagem(margemEstimada)}` : '-'
+                      metricaBaseline = formatarValorComUnidade(margemAtual, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(margemEstimada, tipoNormalizado, unidade)
                       break
 
                     case 'REDUCAO DE RISCO':
                     case 'REDUÇÃO DE RISCO':
-                      // Probabilidade Atual (%) | Probabilidade Com IA (%)
                       const probAtual = baselineData.probabilidadeAtual || baselineData.probabilidade || 0
                       const probComIA = postIAData.probabilidadeComIA || postIAData.probabilidadeDepois || 0
-                      metricaBaseline = probAtual > 0 ? `${formatarPorcentagem(probAtual)}` : '-'
-                      metricaPosIA = probComIA > 0 ? `${formatarPorcentagem(probComIA)}` : '-'
+                      metricaBaseline = formatarValorComUnidade(probAtual, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(probComIA, tipoNormalizado, unidade)
                       break
 
                     case 'QUALIDADE DECISAO':
                     case 'QUALIDADE DECISÃO':
-                      // Taxa Acerto Atual (%) | Taxa Acerto Com IA (%)
                       const taxaAcertoAtual = baselineData.taxaAcertoAtual || 0
                       const taxaAcertoComIA = postIAData.taxaAcertoComIA || 0
-                      metricaBaseline = taxaAcertoAtual > 0 ? `${formatarPorcentagem(taxaAcertoAtual)}` : '-'
-                      metricaPosIA = taxaAcertoComIA > 0 ? `${formatarPorcentagem(taxaAcertoComIA)}` : '-'
+                      metricaBaseline = formatarValorComUnidade(taxaAcertoAtual, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(taxaAcertoComIA, tipoNormalizado, unidade)
                       break
 
                     case 'VELOCIDADE':
-                      // Tempo Entrega Atual | Tempo Entrega Com IA
                       const tempoEntregaAtual = baselineData.tempoMedioEntregaAtual || 0
-                      const unidadeEntrega = baselineData.unidadeTempoEntrega || 'dias'
                       const tempoEntregaComIA = postIAData.tempoMedioEntregaComIA || 0
-                      const unidadeEntregaComIA = postIAData.unidadeTempoEntregaComIA || 'dias'
-                      metricaBaseline = tempoEntregaAtual > 0 ? `${tempoEntregaAtual} ${unidadeEntrega}` : '-'
-                      metricaPosIA = tempoEntregaComIA > 0 ? `${tempoEntregaComIA} ${unidadeEntregaComIA}` : '-'
+                      const unidadeEntregaComIA = postIAData.unidadeTempoEntregaComIA || baselineData.unidadeTempoEntrega || 'dias'
+                      metricaBaseline = formatarValorComUnidade(tempoEntregaAtual, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(tempoEntregaComIA, tipoNormalizado, unidadeEntregaComIA)
                       break
 
                     case 'SATISFACAO':
                     case 'SATISFAÇÃO':
-                      // Score Atual | Score Com IA
                       const scoreAtual = baselineData.scoreAtual || 0
                       const scoreComIA = postIAData.scoreComIA || 0
-                      const tipoScore = baselineData.tipoScore || 'NPS'
-                      metricaBaseline = scoreAtual > 0 ? `${scoreAtual} ${tipoScore}` : '-'
-                      metricaPosIA = scoreComIA > 0 ? `${scoreComIA} ${tipoScore}` : '-'
+                      metricaBaseline = formatarValorComUnidade(scoreAtual, tipoNormalizado, unidade)
+                      metricaPosIA = formatarValorComUnidade(scoreComIA, tipoNormalizado, unidade)
                       break
 
                     default:
-                      // Para outros tipos ou quando não há tempo específico, tenta usar tempo se disponível
-                      if (m.tempoBaselineMinutos > 0 || m.tempoComIAMinutos > 0) {
-                        metricaBaseline = `${Math.round(m.tempoBaselineMinutos || 0)} min`
-                        metricaPosIA = `${Math.round(m.tempoComIAMinutos || 0)} min`
+                      // Tenta calcular tempo para tipos não mapeados (similar a produtividade)
+                      const personsBaselineDefault = indicador.persons_baseline || baselineData.pessoas || []
+                      const personsPostIADefault = indicador.persons_post_ia || postIAData.pessoas || []
+
+                      if (personsBaselineDefault.length > 0 || personsPostIADefault.length > 0) {
+                        const tempoTotalBaselineDefault = personsBaselineDefault.reduce((total, pessoa) => {
+                          const tempoMinutos = pessoa.time_spent_minutes || pessoa.tempoGasto || 0
+                          return total + (parseFloat(tempoMinutos) || 0)
+                        }, 0)
+
+                        const tempoTotalPostIADefault = personsPostIADefault.reduce((total, pessoa) => {
+                          const tempoMinutos = pessoa.time_spent_minutes || pessoa.tempoGasto || 0
+                          return total + (parseFloat(tempoMinutos) || 0)
+                        }, 0)
+
+                        const tempoMedioBaselineDefault = personsBaselineDefault.length > 0 ? tempoTotalBaselineDefault / personsBaselineDefault.length : tempoTotalBaselineDefault
+                        const tempoMedioPostIADefault = personsPostIADefault.length > 0 ? tempoTotalPostIADefault / personsPostIADefault.length : tempoTotalPostIADefault
+
+                        if (tempoMedioBaselineDefault > 0 || tempoMedioPostIADefault > 0) {
+                          metricaBaseline = formatarValorComUnidade(tempoMedioBaselineDefault, 'PRODUTIVIDADE', 'min')
+                          metricaPosIA = formatarValorComUnidade(tempoMedioPostIADefault, 'PRODUTIVIDADE', 'min')
+                        }
+                      } else {
+                        // Fallback para valores genéricos
+                        const valorBaseline = baselineData.valor || m.valorBaseline || 0
+                        const valorPosIA = postIAData.valor || m.valorPosIA || 0
+                        if (valorBaseline > 0 || valorPosIA > 0) {
+                          metricaBaseline = formatarValorComUnidade(valorBaseline, tipoNormalizado, unidade)
+                          metricaPosIA = formatarValorComUnidade(valorPosIA, tipoNormalizado, unidade)
+                        }
                       }
                   }
 
@@ -723,9 +850,13 @@ const Dashboard = () => {
                 return (
                   <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{obterNomeIndicador(indicador) || 'Indicador'}</td>
-                    <td className="py-4 px-4 text-slate-600 dark:text-slate-400">{tipoIndicador}</td>
-                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaBaseline}</td>
-                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300">{metricaPosIA}</td>
+                    <td className="py-4 px-4 text-slate-600 dark:text-slate-400">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {tipoIndicador}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300 font-medium">{metricaBaseline}</td>
+                    <td className="py-4 px-4 text-right text-slate-600 dark:text-slate-300 font-medium">{metricaPosIA}</td>
                     <td className={`py-4 px-4 text-right font-semibold ${(m.economiaAnual || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {formatarMoeda(m.economiaAnual || 0)}
                     </td>

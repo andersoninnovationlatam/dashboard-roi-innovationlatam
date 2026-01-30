@@ -80,8 +80,31 @@ export const projectServiceSupabase = {
         return { success: false, error: 'Usuário não autenticado. Por favor, faça login novamente.' }
       }
 
-      // Buscar organização do usuário
-      const user = await userServiceSupabase.getById(session.user.id)
+      // Buscar organização do usuário (com timeout curto)
+      let user = null
+      try {
+        const userPromise = userServiceSupabase.getById(session.user.id)
+        const userTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        )
+        user = await Promise.race([userPromise, userTimeout])
+      } catch (error) {
+        // Se falhar, tenta buscar diretamente do Supabase (mais rápido)
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('organization_id, role')
+            .eq('id', session.user.id)
+            .single()
+          if (userData) {
+            user = userData
+          }
+        } catch (dbError) {
+          // Se ainda falhar, retorna erro
+          return { success: false, error: 'Não foi possível obter organização do usuário' }
+        }
+      }
+      
       if (!user || !user.organization_id) {
         return { success: false, error: 'Usuário não possui organização associada' }
       }

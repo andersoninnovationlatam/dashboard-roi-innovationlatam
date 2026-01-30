@@ -83,7 +83,11 @@ export const personInvolvedService = {
           role: personData.role,
           hourly_rate: personData.hourly_rate,
           time_spent_minutes: personData.time_spent_minutes,
-          is_validation_only: personData.is_validation_only || false
+          is_validation_only: personData.is_validation_only || false,
+          frequency_real_quantity: personData.frequency_real_quantity || null,
+          frequency_real_unit: personData.frequency_real_unit || null,
+          frequency_desired_quantity: personData.frequency_desired_quantity || null,
+          frequency_desired_unit: personData.frequency_desired_unit || null
         })
         .select()
         .single()
@@ -146,6 +150,10 @@ export const personInvolvedService = {
       if (personData.hourly_rate !== undefined) updateData.hourly_rate = personData.hourly_rate
       if (personData.time_spent_minutes !== undefined) updateData.time_spent_minutes = personData.time_spent_minutes
       if (personData.is_validation_only !== undefined) updateData.is_validation_only = personData.is_validation_only
+      if (personData.frequency_real_quantity !== undefined) updateData.frequency_real_quantity = personData.frequency_real_quantity
+      if (personData.frequency_real_unit !== undefined) updateData.frequency_real_unit = personData.frequency_real_unit
+      if (personData.frequency_desired_quantity !== undefined) updateData.frequency_desired_quantity = personData.frequency_desired_quantity
+      if (personData.frequency_desired_unit !== undefined) updateData.frequency_desired_unit = personData.frequency_desired_unit
 
       const { data, error } = await supabase
         .from('persons_involved')
