@@ -50,9 +50,9 @@ function calcularCustoPessoa(pessoa) {
  */
 function extractIndicatorData(indicator) {
   const info = {
-    nome: indicator.nome || 'Indicador sem nome',
+    nome: indicator.name || indicator.nome || 'Indicador sem nome',
     tipoIndicador: indicator.tipoIndicador || '',
-    descricao: indicator.descricao || ''
+    descricao: indicator.description || indicator.descricao || ''
   }
   
   const baseline = indicator.baselineData || {}

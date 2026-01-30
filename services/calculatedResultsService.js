@@ -15,24 +15,26 @@ export const calculatedResultsService = {
     }
 
     try {
+      // CORREÇÃO: Remover .single() e verificar se há dados antes de retornar
       const { data, error } = await supabase
         .from('calculated_results')
         .select('*')
         .eq('indicator_id', indicatorId)
         .order('calculation_date', { ascending: false })
         .limit(1)
-        .single()
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // Não encontrado
+        // PGRST116 = não encontrado, 406 = Not Acceptable (pode ser RLS ou formato)
+        if (error.code === 'PGRST116' || error.status === 406) {
+          // Não encontrado ou acesso negado - não é crítico, retorna null silenciosamente
           return null
         }
         console.error('Erro ao buscar resultado calculado:', error)
         return null
       }
 
-      return data
+      // Retornar o primeiro resultado ou null se não houver dados
+      return data && data.length > 0 ? data[0] : null
     } catch (error) {
       console.error('Erro ao buscar resultado calculado:', error)
       return null
@@ -188,19 +190,29 @@ export const calculatedResultsService = {
       if (resultData.roi_percentage !== undefined) updateData.roi_percentage = resultData.roi_percentage
       if (resultData.payback_months !== undefined) updateData.payback_months = resultData.payback_months
 
+      // CORREÇÃO: Remover .single() pois pode retornar 0 linhas se RLS bloquear
       const { data, error } = await supabase
         .from('calculated_results')
         .update(updateData)
         .eq('id', id)
         .select()
-        .single()
 
       if (error) {
         console.error('Erro ao atualizar resultado calculado:', error)
-        return { success: false, error: error.message }
+        // Verificar se é erro de RLS ou registro não encontrado
+        if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+          return { success: false, error: 'Resultado calculado não encontrado ou sem permissão para atualizar' }
+        }
+        return { success: false, error: error.message || 'Erro ao atualizar resultado calculado' }
       }
 
-      return { success: true, result: data }
+      // Verificar se retornou dados (pode ser vazio se RLS bloqueou)
+      if (!data || data.length === 0) {
+        console.warn(`Update não retornou dados para calculated_result ${id} - possível bloqueio de RLS`)
+        return { success: false, error: 'Não foi possível atualizar o resultado calculado. Verifique as permissões.' }
+      }
+
+      return { success: true, result: data[0] }
     } catch (error) {
       console.error('Erro ao atualizar resultado calculado:', error)
       return { success: false, error: error.message }

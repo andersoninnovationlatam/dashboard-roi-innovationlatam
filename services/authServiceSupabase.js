@@ -352,8 +352,27 @@ export const authServiceSupabase = {
 
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // CORREÇÃO CRÍTICA: Não busca getById() em TOKEN_REFRESHED - causa timeout desnecessário
+        if (event === 'TOKEN_REFRESHED') {
+          // Token renovado - não precisa buscar dados do usuário novamente
+          if (session?.user) {
+            const userData = {
+              id: session.user.id,
+              email: session.user.email,
+              nome: session.user.user_metadata?.nome || session.user.email?.split('@')[0] || 'Usuário',
+              organization_id: null, // Não busca - será mantido pelo estado atual
+              role: 'viewer', // Não busca - será mantido pelo estado atual
+              created_at: session.user.created_at
+            }
+            callback(userData, event)
+          } else {
+            callback(null, event)
+          }
+          return
+        }
+
         if (session?.user) {
-          // Buscar dados completos do usuário na tabela users
+          // Buscar dados completos do usuário apenas em eventos importantes
           const userRecord = await userServiceSupabase.getById(session.user.id)
           
           const userData = {

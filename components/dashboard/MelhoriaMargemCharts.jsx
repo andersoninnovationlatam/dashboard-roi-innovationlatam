@@ -37,7 +37,7 @@ const MelhoriaMargemCharts = ({ metricas }) => {
     const deltaMargemReais = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       deltaMargemPercent.push(metrica.deltaMargem || 0)
       deltaMargemReais.push(metrica.deltaMargemReais || 0)
     })
@@ -66,7 +66,7 @@ const MelhoriaMargemCharts = ({ metricas }) => {
     const economiaAnual = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       economiaMensal.push(metrica.economiaMensal || 0)
       economiaAnual.push(metrica.economiaAnual || 0)
     })
@@ -95,7 +95,7 @@ const MelhoriaMargemCharts = ({ metricas }) => {
     const payback = []
 
     metricas.forEach(metrica => {
-      labels.push(metrica.nome || 'Indicador')
+      labels.push(metrica.name || metrica.nome || 'Indicador')
       roi.push(metrica.roi || 0)
       payback.push(metrica.payback || 0)
     })
@@ -277,7 +277,7 @@ const MelhoriaMargemCharts = ({ metricas }) => {
             <tbody>
               {metricas.map((metrica, index) => (
                 <tr key={index} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.nome || 'Indicador'}</td>
+                  <td className="py-3 px-3 text-slate-900 dark:text-white font-medium">{metrica.name || metrica.nome || 'Indicador'}</td>
                   <td className="py-3 px-3 text-right text-purple-600 dark:text-purple-400 font-semibold">
                     {metrica.deltaMargem > 0 ? '+' : ''}{metrica.deltaMargem?.toFixed(2)}%
                   </td>

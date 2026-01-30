@@ -87,7 +87,7 @@ export const DataProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }, [user, logout])
+  }, [user?.id, user?.organization_id, logout])
 
   // Carrega dados inicialmente e configura subscriptions real-time
   useEffect(() => {
@@ -157,40 +157,28 @@ export const DataProvider = ({ children }) => {
   }
 
   const createIndicator = async (data) => {
-    console.log('📊 [DataContext] createIndicator chamado')
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
 
     const result = await indicatorServiceSupabase.create(data)
     if (result.success && result.indicator) {
-      console.log('📊 [DataContext] Indicador criado, atualizando estado localmente:', result.indicator.id)
       // Atualiza estado localmente em vez de recarregar tudo
-      setIndicators(prev => {
-        const updated = [...prev, result.indicator]
-        console.log('📊 [DataContext] Estado de indicadores atualizado:', updated.length, 'indicadores')
-        return updated
-      })
+      setIndicators(prev => [...prev, result.indicator])
       return result
     }
     return result
   }
 
   const updateIndicator = async (id, data) => {
-    console.log('📊 [DataContext] updateIndicator chamado para ID:', id)
     if (!user?.id) {
       return { success: false, error: 'Usuário não autenticado' }
     }
 
     const result = await indicatorServiceSupabase.update(id, data)
     if (result.success && result.indicator) {
-      console.log('📊 [DataContext] Indicador atualizado, atualizando estado localmente:', id)
       // Atualiza estado localmente em vez de recarregar tudo
-      setIndicators(prev => {
-        const updated = prev.map(ind => ind.id === id ? result.indicator : ind)
-        console.log('📊 [DataContext] Estado de indicadores atualizado:', updated.length, 'indicadores')
-        return updated
-      })
+      setIndicators(prev => prev.map(ind => ind.id === id ? result.indicator : ind))
       return result
     }
     return result
@@ -230,14 +218,12 @@ export const DataProvider = ({ children }) => {
   }
 
   const getIndicatorById = useCallback(async (id) => {
-    console.log('📊 [DataContext] getIndicatorById chamado para ID:', id, '- Stack:', new Error().stack?.split('\n')[2]?.trim())
     if (!user?.id) {
       return null
     }
 
     try {
       const completeIndicator = await indicatorServiceSupabase.getCompleteById(id)
-      console.log('📊 [DataContext] Indicador encontrado:', completeIndicator ? 'SIM' : 'NÃO')
       return completeIndicator
     } catch (error) {
       console.error('Erro ao buscar indicador do Supabase:', error)
