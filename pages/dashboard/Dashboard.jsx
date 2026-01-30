@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 import { correlationService } from '../../services/correlationService'
-import { calcularMetricasPorTipo } from '../../services/indicatorMetricsService'
+import { calcularMetricasPorTipo, calcularMetricasProdutividade, calcularMetricasIncrementoReceita, calcularMetricasMelhoriaMargem, calcularMetricasReducaoRisco, calcularMetricasQualidadeDecisao, calcularMetricasVelocidade, calcularMetricasSatisfacao, calcularMetricasCapacidadeAnalitica } from '../../services/indicatorMetricsService'
 import Card from '../../components/common/Card'
 import Loading from '../../components/common/Loading'
 import Button from '../../components/common/Button'
@@ -431,128 +431,299 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Gráficos Específicos por Tipo de Indicador */}
-      {tiposPresentes.produtividade && metricasPorTipo.produtividade.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Produtividade
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise detalhada dos indicadores de produtividade
-            </p>
-          </div>
-          <ProdutividadeCharts metricas={metricasPorTipo.produtividade} />
-        </div>
-      )}
+      {/* Cards Individuais por Indicador */}
+      {completeIndicators.map((indicador) => {
+        const tipoIndicador = normalizarTipoIndicador(indicador) || 'Produtividade'
+        const nomeIndicador = obterNomeIndicador(indicador)
 
-      {tiposPresentes.incrementoReceita && metricasPorTipo.incrementoReceita.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Incremento de Receita
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise do delta de receita após implementação
-            </p>
-          </div>
-          <IncrementoReceitaCard metricas={metricasPorTipo.incrementoReceita} />
-        </div>
-      )}
+        // Encontra a métrica específica deste indicador
+        const metricaDetalhada = metricas?.indicadoresDetalhados?.find(item =>
+          item.indicador?.id === indicador.id
+        )
 
-      {tiposPresentes.melhoriaMargem && metricasPorTipo.melhoriaMargem && metricasPorTipo.melhoriaMargem.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Melhoria de Margem
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise de otimização de custos e melhoria da margem de lucro
-            </p>
-          </div>
-          <MelhoriaMargemCharts metricas={metricasPorTipo.melhoriaMargem} />
-        </div>
-      )}
+        // Encontra a métrica por tipo correspondente
+        let metricaPorTipo = null
+        if (tipoIndicador === 'Produtividade') {
+          metricaPorTipo = metricasPorTipo.produtividade.find(m =>
+            m.indicadorNome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Incremento Receita') {
+          metricaPorTipo = metricasPorTipo.incrementoReceita.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Melhoria Margem') {
+          metricaPorTipo = metricasPorTipo.melhoriaMargem.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Redução de Risco') {
+          metricaPorTipo = metricasPorTipo.reducaoRisco.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Qualidade Decisão') {
+          metricaPorTipo = metricasPorTipo.qualidadeDecisao.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Velocidade') {
+          metricaPorTipo = metricasPorTipo.velocidade.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Satisfação') {
+          metricaPorTipo = metricasPorTipo.satisfacao.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        } else if (tipoIndicador === 'Capacidade Analítica') {
+          metricaPorTipo = metricasPorTipo.capacidadeAnalitica.find(m =>
+            m.nome === nomeIndicador ||
+            (indicador.id && metricaDetalhada?.indicador?.id === indicador.id)
+          )
+        }
 
-      {tiposPresentes.reducaoRisco && metricasPorTipo.reducaoRisco && metricasPorTipo.reducaoRisco.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Redução de Risco
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise de riscos evitados, impactos mitigados e retorno da implementação
-            </p>
-          </div>
-          <ReducaoRiscoCharts metricas={metricasPorTipo.reducaoRisco} />
-        </div>
-      )}
+        // Se não encontrou métrica por tipo, tenta calcular agora
+        if (!metricaPorTipo) {
+          let metricaCalculada = null
 
-      {tiposPresentes.capacidadeAnalitica && metricasPorTipo.capacidadeAnalitica && metricasPorTipo.capacidadeAnalitica.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Capacidade Analítica
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise do aumento na capacidade de análise e tomada de decisão
-            </p>
-          </div>
-          <Card>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metricasPorTipo.capacidadeAnalitica.map((metrica, index) => (
-                <div key={index} className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-5 border border-blue-500/20">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metrica.nome}</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrica.aumentoCapacidade || 0}%</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">aumento de capacidade</p>
+          if (tipoIndicador === 'Produtividade') {
+            metricaCalculada = calcularMetricasProdutividade(indicador)
+          } else if (tipoIndicador === 'Incremento Receita') {
+            metricaCalculada = calcularMetricasIncrementoReceita(indicador)
+          } else if (tipoIndicador === 'Melhoria Margem') {
+            metricaCalculada = calcularMetricasMelhoriaMargem(indicador)
+          } else if (tipoIndicador === 'Redução de Risco') {
+            metricaCalculada = calcularMetricasReducaoRisco(indicador)
+          } else if (tipoIndicador === 'Qualidade Decisão') {
+            metricaCalculada = calcularMetricasQualidadeDecisao(indicador)
+          } else if (tipoIndicador === 'Velocidade') {
+            metricaCalculada = calcularMetricasVelocidade(indicador)
+          } else if (tipoIndicador === 'Satisfação') {
+            metricaCalculada = calcularMetricasSatisfacao(indicador)
+          } else if (tipoIndicador === 'Capacidade Analítica') {
+            metricaCalculada = calcularMetricasCapacidadeAnalitica(indicador)
+          }
+
+          if (metricaCalculada) {
+            metricaPorTipo = metricaCalculada
+          }
+        }
+
+        // Renderiza card baseado no tipo
+        if (tipoIndicador === 'Produtividade' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-blue-500/5 to-cyan-500/5 border-blue-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
                 </div>
-              ))}
+                <ProdutividadeCharts metricas={[metricaPorTipo]} />
+              </Card>
             </div>
-          </Card>
-        </div>
-      )}
+          )
+        }
 
-      {tiposPresentes.qualidadeDecisao && metricasPorTipo.qualidadeDecisao && metricasPorTipo.qualidadeDecisao.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Qualidade de Decisão
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise de melhoria na assertividade das decisões e economia com erros evitados
-            </p>
-          </div>
-          <QualidadeDecisaoCharts metricas={metricasPorTipo.qualidadeDecisao} />
-        </div>
-      )}
+        if (tipoIndicador === 'Incremento Receita' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-green-500/5 to-emerald-500/5 border-green-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <IncrementoReceitaCard metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
 
-      {tiposPresentes.velocidade && metricasPorTipo.velocidade && metricasPorTipo.velocidade.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Velocidade
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise de ganhos em velocidade de entrega e produtividade
-            </p>
-          </div>
-          <VelocidadeCharts metricas={metricasPorTipo.velocidade} />
-        </div>
-      )}
+        if (tipoIndicador === 'Melhoria Margem' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border-purple-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <MelhoriaMargemCharts metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
 
-      {tiposPresentes.satisfacao && metricasPorTipo.satisfacao && metricasPorTipo.satisfacao.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-              Métricas de Satisfação
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Análise de impacto na satisfação do cliente, retenção e LTV
-            </p>
-          </div>
-          <SatisfacaoCharts metricas={metricasPorTipo.satisfacao} />
-        </div>
-      )}
+        if (tipoIndicador === 'Redução de Risco' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-red-500/5 to-rose-500/5 border-red-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <ReducaoRiscoCharts metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
+
+        if (tipoIndicador === 'Qualidade Decisão' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-indigo-500/5 to-violet-500/5 border-indigo-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <QualidadeDecisaoCharts metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
+
+        if (tipoIndicador === 'Velocidade' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-yellow-500/5 to-amber-500/5 border-yellow-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <VelocidadeCharts metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
+
+        if (tipoIndicador === 'Satisfação' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-pink-500/5 to-rose-500/5 border-pink-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <SatisfacaoCharts metricas={[metricaPorTipo]} />
+              </Card>
+            </div>
+          )
+        }
+
+        if (tipoIndicador === 'Capacidade Analítica' && metricaPorTipo) {
+          return (
+            <div key={indicador.id || `indicador-${nomeIndicador}`} className="mb-8">
+              <Card className="bg-gradient-to-br from-cyan-500/5 to-blue-500/5 border-cyan-500/20">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {nomeIndicador}
+                    </h2>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
+                      {tipoIndicador}
+                    </span>
+                  </div>
+                  {indicador.description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {indicador.description}
+                    </p>
+                  )}
+                </div>
+                <Card>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-5 border border-blue-500/20">
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{metricaPorTipo.nome || nomeIndicador}</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metricaPorTipo.aumentoCapacidade || 0}%</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">aumento de capacidade</p>
+                    </div>
+                  </div>
+                </Card>
+              </Card>
+            </div>
+          )
+        }
+
+        // Fallback para tipos não mapeados
+        return null
+      })}
 
       {/* Gráficos Gerais - Mostrar apenas se houver dados */}
       {(dadosEvolucao.datasets.length > 0 || dadosComparacao.datasets.length > 0) && (

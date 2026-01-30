@@ -10,20 +10,33 @@ const IncrementoReceitaCard = ({ metricas }) => {
     return null
   }
 
-  // Calcula totais
-  const totalReceitaAntes = metricas.reduce((sum, m) => sum + (m.valorReceitaAntes || 0), 0)
-  const totalReceitaDepois = metricas.reduce((sum, m) => sum + (m.valorReceitaDepois || 0), 0)
-  const totalDeltaReceita = metricas.reduce((sum, m) => sum + (m.deltaReceita || 0), 0)
+  // Se há apenas uma métrica, usa valores individuais; senão calcula totais
+  const isSingle = metricas.length === 1
+  const metrica = isSingle ? metricas[0] : null
+  
+  const totalReceitaAntes = isSingle 
+    ? (metrica?.valorReceitaAntes || 0)
+    : metricas.reduce((sum, m) => sum + (m.valorReceitaAntes || 0), 0)
+  const totalReceitaDepois = isSingle
+    ? (metrica?.valorReceitaDepois || 0)
+    : metricas.reduce((sum, m) => sum + (m.valorReceitaDepois || 0), 0)
+  const totalDeltaReceita = isSingle
+    ? (metrica?.deltaReceita || 0)
+    : metricas.reduce((sum, m) => sum + (m.deltaReceita || 0), 0)
+
+  const titulo = isSingle 
+    ? `${metrica?.indicadorNome || 'Incremento de Receita'}`
+    : 'Incremento de Receita - Resumo Geral'
 
   return (
     <div className="space-y-6">
-      {/* Card de Resumo Total */}
+      {/* Card de Resumo */}
       <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                Incremento de Receita - Resumo Geral
+                {titulo}
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Comparação entre Receita Antes e Depois da implementação
