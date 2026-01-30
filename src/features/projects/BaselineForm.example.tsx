@@ -1,34 +1,38 @@
 /**
  * Exemplo de uso do componente BaselineForm
+ * ATUALIZADO: Agora usa a estrutura normalizada via indicatorServiceSupabase
  */
 
 import { BaselineForm } from './BaselineForm'
-import { useBaseline } from '../../hooks/useBaseline'
 import { BaselineData } from '../../types/baseline'
 import { useState } from 'react'
 
 export const BaselineFormExample = () => {
-  const indicatorId = 'indicator-123' // ID do indicador no Supabase
   const [baselineData, setBaselineData] = useState<BaselineData | null>(null)
-
-  const { saveBaseline, loading, error } = useBaseline({
-    indicatorId,
-    onSuccess: () => {
-      console.log('Baseline salvo com sucesso!')
-      alert('Baseline salvo com sucesso!')
-    },
-    onError: (error) => {
-      console.error('Erro ao salvar:', error)
-      alert(`Erro: ${error.message}`)
-    }
-  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
   const handleSubmit = async (data: BaselineData) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      await saveBaseline(data)
+      // TODO: Integrar com indicatorServiceSupabase para salvar dados normalizados
+      // Por enquanto, apenas demonstra o uso do componente
+      console.log('Dados do baseline:', data)
+      
+      // Simular salvamento
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      console.log('Baseline salvo com sucesso!')
+      alert('Baseline salvo com sucesso!')
     } catch (err) {
-      // Erro já é tratado no onError do hook
-      console.error(err)
+      const error = err instanceof Error ? err : new Error('Erro ao salvar baseline')
+      setError(error)
+      console.error('Erro ao salvar:', error)
+      alert(`Erro: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -46,6 +50,12 @@ export const BaselineFormExample = () => {
       {error && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
           <strong>Erro:</strong> {error.message}
+        </div>
+      )}
+
+      {loading && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-800 dark:text-blue-200">
+          Salvando...
         </div>
       )}
 

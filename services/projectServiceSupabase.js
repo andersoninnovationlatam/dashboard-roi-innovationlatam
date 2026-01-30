@@ -1,32 +1,29 @@
 /**
  * Serviço de Projetos com Supabase
- * Gerencia CRUD de projetos usando Supabase
+ * Gerencia CRUD de projetos usando Supabase (estrutura normalizada)
  */
 
 import { supabase, isSupabaseConfigured } from '../src/lib/supabase'
+import { userServiceSupabase } from './userServiceSupabase'
 
 export const projectServiceSupabase = {
   /**
-   * Retorna todos os projetos do usuário autenticado
-   * @param {string} userId - ID do usuário (opcional, RLS já filtra automaticamente)
+   * Retorna todos os projetos da organização do usuário autenticado
+   * RLS já filtra automaticamente por organization_id
    */
-  async getAll(userId) {
+  async getAll(limit = 1000) {
     if (!isSupabaseConfigured || !supabase) {
       console.warn('Supabase não configurado, retornando array vazio')
       return []
     }
 
     try {
-      let query = supabase
+      // OTIMIZAÇÃO: Limita resultados e seleciona apenas campos necessários
+      const { data, error } = await supabase
         .from('projects')
-        .select('*')
-      
-      // Se userId fornecido, filtra explicitamente (RLS já faz isso, mas é mais seguro)
-      if (userId) {
-        query = query.eq('user_id', userId)
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false })
+        .select('id, organization_id, name, description, status, development_type, start_date, go_live_date, end_date, implementation_cost, monthly_maintenance_cost, business_area, sponsor, created_by, created_at, updated_at')
+        .order('created_at', { ascending: false })
+        .limit(limit)
 
       if (error) {
         console.error('Erro ao buscar projetos:', error)
@@ -76,19 +73,44 @@ export const projectServiceSupabase = {
     }
 
     try {
-      // Obter sessão atual (mais confiável que getUser)
+      // Obter sessão atual
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
         console.error('Sessão não encontrada ao criar projeto')
         return { success: false, error: 'Usuário não autenticado. Por favor, faça login novamente.' }
       }
 
+      // Buscar organização do usuário
+      const user = await userServiceSupabase.getById(session.user.id)
+      if (!user || !user.organization_id) {
+        return { success: false, error: 'Usuário não possui organização associada' }
+      }
+
+      // Preparar dados do projeto
+      const businessAreaValue = projectData.business_area || projectData.department || null
+      
+      const insertData = {
+        organization_id: user.organization_id,
+        name: projectData.name,
+        description: projectData.description || null,
+        status: projectData.status || 'planning',
+        development_type: projectData.development_type || 'other',
+        start_date: projectData.start_date || null,
+        go_live_date: projectData.go_live_date || null,
+        end_date: projectData.end_date || null,
+        implementation_cost: projectData.implementation_cost || 0,
+        monthly_maintenance_cost: projectData.monthly_maintenance_cost || 0,
+        business_area: businessAreaValue,
+        sponsor: projectData.sponsor || null,
+        created_by: session.user.id,
+        // Compatibilidade: campos legados ainda podem ser obrigatórios na tabela antiga
+        user_id: session.user.id,
+        department: businessAreaValue || 'Geral' // Valor padrão se department for NOT NULL
+      }
+
       const { data, error } = await supabase
         .from('projects')
-        .insert({
-          ...projectData,
-          user_id: session.user.id
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -134,26 +156,18 @@ export const projectServiceSupabase = {
 
   /**
    * Deleta um projeto
-   * @param {string} id - ID do projeto
-   * @param {string} userId - ID do usuário (opcional, RLS já garante segurança)
+   * RLS já garante segurança (apenas admins podem deletar)
    */
-  async delete(id, userId) {
+  async delete(id) {
     if (!isSupabaseConfigured || !supabase) {
       return { success: false, error: 'Supabase não configurado' }
     }
 
     try {
-      // RLS já garante que só deleta projetos do usuário, mas podemos adicionar filtro explícito
-      let query = supabase
+      const { error } = await supabase
         .from('projects')
         .delete()
         .eq('id', id)
-      
-      if (userId) {
-        query = query.eq('user_id', userId)
-      }
-      
-      const { error } = await query
 
       if (error) {
         console.error('Erro ao deletar projeto:', error)
@@ -164,6 +178,42 @@ export const projectServiceSupabase = {
     } catch (error) {
       console.error('Erro ao deletar projeto:', error)
       return { success: false, error: error.message }
+    }
+  },
+
+  /**
+   * Retorna projeto completo com organização e contagem de indicadores
+   */
+  async getCompleteById(id) {
+    if (!isSupabaseConfigured || !supabase) {
+      return null
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          organizations (*),
+          indicators_normalized (id)
+        `)
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        console.error('Erro ao buscar projeto completo:', error)
+        return null
+      }
+
+      if (data) {
+        data.indicators_count = data.indicators_normalized?.length || 0
+        delete data.indicators_normalized
+      }
+
+      return data
+    } catch (error) {
+      console.error('Erro ao buscar projeto completo:', error)
+      return null
     }
   }
 }

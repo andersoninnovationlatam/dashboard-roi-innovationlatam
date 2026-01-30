@@ -19,13 +19,13 @@ export const ThemeProvider = ({ children }) => {
       try {
         // CORREÇÃO: Usa getSession() em vez de getUser() para validar sessão
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (error) {
           console.warn('⚠️ Erro ao obter sessão no ThemeContext:', error.message)
           setUserId(null)
           return
         }
-        
+
         setUserId(session?.user?.id || null)
       } catch (error) {
         console.error('Erro ao obter usuário:', error)
@@ -55,7 +55,7 @@ export const ThemeProvider = ({ children }) => {
   // Carrega tema do banco ao fazer login ou preferência do navegador
   useEffect(() => {
     let isMounted = true // Evita race conditions
-    
+
     const loadTheme = async () => {
       // Se não estiver logado, usa dark como padrão
       if (!userId || !isSupabaseConfigured || !supabase) {
@@ -69,7 +69,7 @@ export const ThemeProvider = ({ children }) => {
       try {
         // CORREÇÃO: Valida sessão antes de buscar tema
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
+
         if (sessionError || !session?.user) {
           console.warn('⚠️ Sessão inválida ao carregar tema, usando padrão')
           if (isMounted) {
@@ -118,7 +118,7 @@ export const ThemeProvider = ({ children }) => {
     }
 
     loadTheme()
-    
+
     return () => {
       isMounted = false // Cleanup
     }
@@ -142,7 +142,7 @@ export const ThemeProvider = ({ children }) => {
         try {
           // Valida sessão antes de salvar
           const { data: { session } } = await supabase.auth.getSession()
-          
+
           if (!session?.user) {
             console.warn('⚠️ Sessão inválida, não é possível salvar tema')
             return
@@ -164,7 +164,7 @@ export const ThemeProvider = ({ children }) => {
           console.debug('Erro ao salvar tema (ignorado):', error)
         }
       }
-      
+
       saveTheme()
     }
   }, [theme, userId, loading])

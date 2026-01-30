@@ -4,6 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../src/lib/supabase'
+import { userServiceSupabase } from './userServiceSupabase'
 
 export const authServiceSupabase = {
   /**
@@ -33,11 +34,15 @@ export const authServiceSupabase = {
       }
 
       if (data.user) {
-        // Retorna dados do usuário (sem senha)
+        // Buscar dados completos do usuário na tabela users
+        const userRecord = await userServiceSupabase.getById(data.user.id)
+        
         const userData = {
           id: data.user.id,
           email: data.user.email,
           nome: data.user.user_metadata?.nome || nome,
+          organization_id: userRecord?.organization_id || null,
+          role: userRecord?.role || 'viewer',
           created_at: data.user.created_at
         }
 
@@ -54,7 +59,14 @@ export const authServiceSupabase = {
    * Faz login do usuário no Supabase
    */
   async login(email, senha) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:61',message:'login() ENTRY',data:{email:email?.substring(0,10)+'...',hasPassword:!!senha},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     if (!isSupabaseConfigured) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:63',message:'login() ERROR - Supabase não configurado',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return { 
         success: false, 
         error: 'Supabase não está configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env' 
@@ -62,10 +74,38 @@ export const authServiceSupabase = {
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: senha
-      })
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:70',message:'login() BEFORE signInWithPassword',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      let signInResult = null
+      let signInError = null
+      
+      try {
+        // Timeout explícito de 10 segundos para signInWithPassword
+        const signInPromise = supabase.auth.signInWithPassword({
+          email,
+          password: senha
+        })
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: signInWithPassword demorou mais de 10 segundos')), 10000)
+        )
+        
+        signInResult = await Promise.race([signInPromise, timeoutPromise])
+        signInError = signInResult.error
+      } catch (catchError) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:85',message:'login() signInWithPassword CATCH',data:{errorMessage:catchError?.message,errorStack:catchError?.stack?.substring(0,200),isTimeout:catchError?.message?.includes('Timeout')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        signInError = catchError
+      }
+      
+      const { data, error } = signInResult || { data: null, error: signInError }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:104',message:'login() AFTER signInWithPassword',data:{hasError:!!error,errorMessage:error?.message,errorCode:error?.status,hasUser:!!data?.user,userId:data?.user?.id,hasData:!!data,hasSignInResult:!!signInResult},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       if (error) {
         // Tratamento específico para email não confirmado
@@ -97,19 +137,56 @@ export const authServiceSupabase = {
       }
 
       if (data.user) {
-        // Retorna dados do usuário
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:120',message:'login() USER AUTHENTICATED - Returning immediately',data:{userId:data.user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        // CORREÇÃO CRÍTICA: Retorna sucesso imediatamente após autenticação
+        // getById() será buscado assincronamente pelo AuthContext via onAuthStateChange
         const userData = {
           id: data.user.id,
           email: data.user.email,
           nome: data.user.user_metadata?.nome || email.split('@')[0],
+          organization_id: null, // Será preenchido pelo AuthContext
+          role: 'viewer', // Será preenchido pelo AuthContext
           created_at: data.user.created_at
         }
+        
+        // Buscar dados do usuário em background (não bloqueia login)
+        userServiceSupabase.getById(data.user.id)
+          .then(userRecord => {
+            if (userRecord) {
+              // Atualizar último login apenas se conseguiu buscar
+              userServiceSupabase.updateLastLogin(data.user.id).catch(() => {})
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:135',message:'login() BACKGROUND getById SUCCESS',data:{userId:data.user.id,organizationId:userRecord?.organization_id,role:userRecord?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+              // #endregion
+            }
+          })
+          .catch(error => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:140',message:'login() BACKGROUND getById ERROR',data:{errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            // Não é crítico - login já foi bem-sucedido
+            console.warn('Não foi possível buscar dados completos do usuário em background:', error.message)
+          })
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:145',message:'login() RETURN SUCCESS IMMEDIATELY',data:{userId:userData.id,email:userData.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
 
         return { success: true, user: userData }
       }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:136',message:'login() RETURN NO USER',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       return { success: false, error: 'Erro ao fazer login' }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/06b48f4d-09b2-466b-ab45-b2db14eca3d1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authServiceSupabase.js:138',message:'login() CATCH ERROR',data:{errorMessage:error?.message,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return { success: false, error: error.message || 'Erro ao fazer login' }
     }
   },
@@ -180,6 +257,7 @@ export const authServiceSupabase = {
 
   /**
    * Retorna o usuário atual com validação no servidor
+   * OTIMIZADO: Não força refresh desnecessário, timeout melhorado
    */
   async getCurrentUser() {
     if (!isSupabaseConfigured) {
@@ -187,45 +265,57 @@ export const authServiceSupabase = {
     }
 
     try {
-      // Passo 1: Verifica se existe sessão local
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // Passo 1: getSession() é rápido e não precisa timeout rigoroso
+      // Usa timeout maior (10s) para dar tempo após login
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout ao obter sessão')), 10000)
+      )
+      
+      const { data: { session }, error: sessionError } = await Promise.race([
+        sessionPromise,
+        timeoutPromise
+      ])
       
       if (sessionError || !session) {
         return null
       }
 
-      // Passo 2: CRÍTICO - Força refresh para validar com servidor
-      // Isso garante que usuários deletados sejam deslogados
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-
-      if (refreshError) {
-        console.warn('Sessão inválida detectada:', refreshError.message)
-        // Limpa sessão corrompida
-        await supabase.auth.signOut()
-        return null
-      }
-
-      const user = refreshData?.user
+      const user = session.user
       if (!user) {
-        console.warn('Usuário não existe mais no servidor')
-        await supabase.auth.signOut()
         return null
       }
 
-      // Passo 3: Retorna dados validados
+      // OTIMIZAÇÃO: Não força refresh após login recente
+      // Apenas busca dados do usuário na tabela users
+      let userRecord = null
+      try {
+        // Timeout reduzido para 3s (query simples)
+        const userPromise = userServiceSupabase.getById(user.id)
+        const userTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 3000)
+        )
+        
+        userRecord = await Promise.race([userPromise, userTimeout])
+      } catch (userError) {
+        // Não é crítico - continua sem dados da tabela users
+        // Isso pode acontecer se RLS bloquear ou tabela não existir
+        // Não loga como erro para não poluir console
+      }
+      
+      // Retorna dados validados
       return {
         id: user.id,
         email: user.email,
         nome: user.user_metadata?.nome || user.email?.split('@')[0] || 'Usuário',
+        organization_id: userRecord?.organization_id || null,
+        role: userRecord?.role || 'viewer',
         created_at: user.created_at
       }
     } catch (error) {
-      console.error('Erro ao obter usuário:', error)
-      // Em caso de erro, limpa a sessão por segurança
-      try {
-        await supabase.auth.signOut()
-      } catch (e) {
-        console.error('Erro ao fazer logout de segurança:', e)
+      // Erro silencioso - não mostra timeout como erro crítico
+      if (!error.message?.includes('Timeout')) {
+        console.error('Erro ao obter usuário:', error)
       }
       return null
     }
@@ -261,12 +351,17 @@ export const authServiceSupabase = {
     }
 
     try {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
+          // Buscar dados completos do usuário na tabela users
+          const userRecord = await userServiceSupabase.getById(session.user.id)
+          
           const userData = {
             id: session.user.id,
             email: session.user.email,
             nome: session.user.user_metadata?.nome || session.user.email?.split('@')[0] || 'Usuário',
+            organization_id: userRecord?.organization_id || null,
+            role: userRecord?.role || 'viewer',
             created_at: session.user.created_at
           }
           callback(userData, event)

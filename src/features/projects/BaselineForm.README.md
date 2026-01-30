@@ -45,18 +45,27 @@ Componente de formulário para cadastro de Baseline de indicadores de ROI, basea
 
 ```tsx
 import { BaselineForm } from './features/projects/BaselineForm'
-import { useBaseline } from './hooks/useBaseline'
+import { indicatorServiceSupabase } from '../../services/indicatorServiceSupabase'
 import { BaselineData } from './types/baseline'
 
 function MyComponent() {
   const indicatorId = 'indicator-123'
-  const { saveBaseline, loading } = useBaseline({ 
-    indicatorId,
-    onSuccess: () => console.log('Salvo com sucesso!')
-  })
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (data: BaselineData) => {
-    await saveBaseline(data)
+    setLoading(true)
+    try {
+      // Usar indicatorServiceSupabase para salvar dados normalizados
+      const indicator = await indicatorServiceSupabase.getCompleteById(indicatorId)
+      if (indicator) {
+        // O serviço gerencia a conversão para estrutura normalizada
+        await indicatorServiceSupabase.update(indicatorId, {
+          // Dados serão convertidos automaticamente
+        })
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

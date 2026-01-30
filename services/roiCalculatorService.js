@@ -1,7 +1,10 @@
 /**
  * Serviço de Cálculo de ROI
- * Implementa todas as fórmulas de cálculo de ROI conforme documentação
+ * Implementa todas as fórmulas de cálculo de ROI conforme especificação técnica
+ * Suporta tanto estrutura normalizada quanto formato legado (JSONB) para compatibilidade
  */
+
+import { FrequencyUnit } from '../src/types'
 
 /**
  * Converte valor para número, tratando strings vazias e valores inválidos
@@ -14,20 +17,49 @@ const toNumber = (value, defaultValue = 0) => {
 }
 
 /**
- * Converte período para multiplicador mensal
- * Formato atual: 'Diário' | 'Semanal' | 'Mensal'
+ * Converte frequency_unit para multiplicador anual conforme especificação
+ */
+const getFrequencyMultiplier = (unit) => {
+  switch (unit) {
+    case FrequencyUnit.HOUR:
+      return 8760 // 24h × 365 dias
+    case FrequencyUnit.DAY:
+      return 365
+    case FrequencyUnit.WEEK:
+      return 52
+    case FrequencyUnit.MONTH:
+      return 12
+    case FrequencyUnit.QUARTER:
+      return 4
+    case FrequencyUnit.YEAR:
+      return 1
+    default:
+      return 12 // Default mensal
+  }
+}
+
+/**
+ * Converte frequency_value e frequency_unit para frequência anual
+ */
+const convertToAnnualFrequency = (value, unit) => {
+  const multiplier = getFrequencyMultiplier(unit)
+  return toNumber(value) * multiplier
+}
+
+/**
+ * Converte período legado para multiplicador mensal (compatibilidade)
  */
 const calcularHorasPorMes = (quantidade, periodo) => {
   const qtd = toNumber(quantidade)
   if (qtd === 0) return 0
-  
+
   switch (periodo) {
     case 'Diário':
-      return qtd * 30 // 30 dias por mês (média)
+      return qtd * 30
     case 'Semanal':
-      return qtd * 4.33 // 52 semanas / 12 meses = 4.333... semanas por mês
+      return qtd * 4.33
     case 'Mensal':
-      return qtd // Já está em meses
+      return qtd
     default:
       return qtd
   }
@@ -38,197 +70,356 @@ const calcularHorasPorMes = (quantidade, periodo) => {
  */
 const calcularCustoHoraMedio = (pessoas) => {
   if (!pessoas || pessoas.length === 0) return 0
-  
-  const pessoasComValor = pessoas.filter(p => toNumber(p.valorHora) > 0)
+
+  const pessoasComValor = pessoas.filter(p => {
+    const valorHora = p.hourly_rate || p.valorHora || 0
+    return toNumber(valorHora) > 0
+  })
   if (pessoasComValor.length === 0) return 0
-  
-  const soma = pessoasComValor.reduce((acc, p) => acc + toNumber(p.valorHora), 0)
+
+  const soma = pessoasComValor.reduce((acc, p) => {
+    const valorHora = p.hourly_rate || p.valorHora || 0
+    return acc + toNumber(valorHora)
+  }, 0)
   return soma / pessoasComValor.length
 }
 
 /**
- * Calcula tempo total em minutos considerando pessoas
- * Formato atual: usa tempoGasto (minutos) e frequenciaReal
+ * Calcula horas baseline usando estrutura normalizada ou legada
  */
-const calcularTempoTotalPessoas = (pessoas) => {
-  if (!pessoas || pessoas.length === 0) return 0
-  
-  return pessoas.reduce((total, pessoa) => {
-    const tempoGasto = toNumber(pessoa.tempoGasto) // em minutos
+const calcularHorasBaseline = (indicador, personsBaseline) => {
+  if (!personsBaseline || personsBaseline.length === 0) return 0
+
+  // Estrutura normalizada: usa frequency_value e frequency_unit do indicador
+  if (indicador.frequency_value && indicador.frequency_unit) {
+    const frequencyAnual = convertToAnnualFrequency(
+      indicador.baseline_frequency_real || indicador.frequency_value,
+      indicador.frequency_unit
+    )
+
+    // Calcula tempo total por execução em horas
+    const tempoTotalPorExecucaoHoras = personsBaseline.reduce((total, pessoa) => {
+      const tempoMinutos = toNumber(pessoa.time_spent_minutes || pessoa.tempoGasto || 0)
+      return total + (tempoMinutos / 60)
+    }, 0)
+
+    // Horas totais por ano = tempo por execução × frequência anual
+    return tempoTotalPorExecucaoHoras * frequencyAnual
+  }
+
+  // Formato legado: usa frequenciaReal de cada pessoa
+  return personsBaseline.reduce((total, pessoa) => {
+    const tempoMinutos = toNumber(pessoa.tempoGasto || pessoa.time_spent_minutes || 0)
     const quantidade = toNumber(pessoa.frequenciaReal?.quantidade || 0)
     const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
-    const horasPorMes = calcularHorasPorMes(quantidade, periodo)
-    // Converte horas para minutos e multiplica pelo tempo gasto por execução
-    return total + (tempoGasto * horasPorMes)
+    const execucoesPorMes = calcularHorasPorMes(quantidade, periodo)
+    const horasPorMes = (tempoMinutos / 60) * execucoesPorMes
+    return total + (horasPorMes * 12) // Anualiza
+  }, 0)
+}
+
+/**
+ * Calcula horas pós-IA usando estrutura normalizada ou legada
+ */
+const calcularHorasPostIA = (indicador, personsPostIA) => {
+  if (!personsPostIA || personsPostIA.length === 0) return 0
+
+  // Estrutura normalizada
+  if (indicador.frequency_value && indicador.frequency_unit) {
+    const frequencyAnual = convertToAnnualFrequency(
+      indicador.post_ia_frequency || indicador.frequency_value,
+      indicador.frequency_unit
+    )
+
+    const tempoTotalPorExecucaoHoras = personsPostIA.reduce((total, pessoa) => {
+      const tempoMinutos = toNumber(pessoa.time_spent_minutes || pessoa.tempoGasto || 0)
+      return total + (tempoMinutos / 60)
+    }, 0)
+
+    return tempoTotalPorExecucaoHoras * frequencyAnual
+  }
+
+  // Formato legado
+  return personsPostIA.reduce((total, pessoa) => {
+    const tempoMinutos = toNumber(pessoa.tempoGasto || pessoa.time_spent_minutes || 0)
+    const quantidade = toNumber(pessoa.frequenciaReal?.quantidade || 0)
+    const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
+    const execucoesPorMes = calcularHorasPorMes(quantidade, periodo)
+    const horasPorMes = (tempoMinutos / 60) * execucoesPorMes
+    return total + (horasPorMes * 12)
+  }, 0)
+}
+
+/**
+ * Calcula custo de mão de obra baseline anual
+ */
+const calcularCustoMaoObraBaseline = (indicador, personsBaseline) => {
+  if (!personsBaseline || personsBaseline.length === 0) return 0
+
+  // Estrutura normalizada
+  if (indicador.frequency_value && indicador.frequency_unit) {
+    const frequencyAnual = convertToAnnualFrequency(
+      indicador.baseline_frequency_real || indicador.frequency_value,
+      indicador.frequency_unit
+    )
+
+    return personsBaseline.reduce((total, pessoa) => {
+      const tempoMinutos = toNumber(pessoa.time_spent_minutes || pessoa.tempoGasto || 0)
+      const valorHora = toNumber(pessoa.hourly_rate || pessoa.valorHora || 0)
+      const tempoHoras = tempoMinutos / 60
+      return total + (tempoHoras * valorHora * frequencyAnual)
+    }, 0)
+  }
+
+  // Formato legado
+  return personsBaseline.reduce((total, pessoa) => {
+    const tempoMinutos = toNumber(pessoa.tempoGasto || 0)
+    const valorHora = toNumber(pessoa.valorHora || 0)
+    const quantidade = toNumber(pessoa.frequenciaReal?.quantidade || 0)
+    const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
+    const execucoesPorMes = calcularHorasPorMes(quantidade, periodo)
+    const horasPorMes = (tempoMinutos / 60) * execucoesPorMes
+    return total + (horasPorMes * valorHora * 12)
+  }, 0)
+}
+
+/**
+ * Calcula custo de mão de obra pós-IA anual
+ */
+const calcularCustoMaoObraPostIA = (indicador, personsPostIA) => {
+  if (!personsPostIA || personsPostIA.length === 0) return 0
+
+  // Estrutura normalizada
+  if (indicador.frequency_value && indicador.frequency_unit) {
+    const frequencyAnual = convertToAnnualFrequency(
+      indicador.post_ia_frequency || indicador.frequency_value,
+      indicador.frequency_unit
+    )
+
+    return personsPostIA.reduce((total, pessoa) => {
+      const tempoMinutos = toNumber(pessoa.time_spent_minutes || pessoa.tempoGasto || 0)
+      const valorHora = toNumber(pessoa.hourly_rate || pessoa.valorHora || 0)
+      const tempoHoras = tempoMinutos / 60
+      return total + (tempoHoras * valorHora * frequencyAnual)
+    }, 0)
+  }
+
+  // Formato legado
+  return personsPostIA.reduce((total, pessoa) => {
+    const tempoMinutos = toNumber(pessoa.tempoGasto || 0)
+    const valorHora = toNumber(pessoa.valorHora || 0)
+    const quantidade = toNumber(pessoa.frequenciaReal?.quantidade || 0)
+    const periodo = pessoa.frequenciaReal?.periodo || 'Mensal'
+    const execucoesPorMes = calcularHorasPorMes(quantidade, periodo)
+    const horasPorMes = (tempoMinutos / 60) * execucoesPorMes
+    return total + (horasPorMes * valorHora * 12)
+  }, 0)
+}
+
+/**
+ * Calcula custo de ferramentas anual (baseline ou pós-IA)
+ */
+const calcularCustoFerramentasAnual = (tools, frequencyAnual = null) => {
+  if (!tools || tools.length === 0) return 0
+
+  return tools.reduce((total, tool) => {
+    const custoMensal = toNumber(tool.monthly_cost || tool.custoMensal || 0)
+    const custoAnualMensal = custoMensal * 12
+
+    // Se há custo por execução e frequência anual, adiciona
+    if (frequencyAnual && tool.cost_per_execution) {
+      const custoPorExecucao = toNumber(tool.cost_per_execution)
+      return total + custoAnualMensal + (custoPorExecucao * frequencyAnual)
+    }
+
+    // Formato legado
+    if (tool.valor && tool.tipo) {
+      if (tool.tipo === 'anual') {
+        return total + toNumber(tool.valor)
+      }
+      return total + (toNumber(tool.valor) * 12)
+    }
+
+    return total + custoAnualMensal
   }, 0)
 }
 
 /**
  * Calcula ROI de um indicador individual
+ * Suporta estrutura normalizada e formato legado
  */
 export const calcularROIIndicador = (indicador) => {
   if (!indicador) {
     return null
   }
 
-  // Formato atual: usa baselineData e postIAData com pessoas (tempoGasto e frequenciaReal)
-  const baselineData = indicador.baselineData || {}
-  const postIAData = indicador.postIAData || indicador.post_ia_data || {}
-  
-  let tempoBaselineMinutos = 0
-  let tempoComIAMinutos = 0
-  let volumeBaseline = 0
-  let volumeIA = 0
+  // Detectar estrutura: normalizada ou legada
+  const isNormalized = indicador.persons_baseline !== undefined ||
+    indicador.persons_post_ia !== undefined ||
+    (indicador.frequency_value && indicador.frequency_unit)
 
-  // CÁLCULO ATUAL - Usando pessoas detalhadas com formato atual
-  const pessoasBaseline = baselineData.pessoas || []
-  const pessoasPostIA = postIAData.pessoas || []
-  
-  // Calcula tempo total em minutos/mês
-  tempoBaselineMinutos = calcularTempoTotalPessoas(pessoasBaseline)
-  tempoComIAMinutos = calcularTempoTotalPessoas(pessoasPostIA)
-  
-  // Calcula volume (quantidade de execuções por mês) baseado na frequência real
-  pessoasBaseline.forEach(p => {
-    const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
-    const periodo = p.frequenciaReal?.periodo || 'Mensal'
-    volumeBaseline += calcularHorasPorMes(quantidade, periodo)
-  })
-  
-  pessoasPostIA.forEach(p => {
-    const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
-    const periodo = p.frequenciaReal?.periodo || 'Mensal'
-    volumeIA += calcularHorasPorMes(quantidade, periodo)
-  })
+  let personsBaseline = []
+  let personsPostIA = []
+  let toolsBaseline = []
+  let toolsPostIA = []
+  let frequencyAnualBaseline = 0
+  let frequencyAnualPostIA = 0
 
-  // Economia de tempo
-  const tempoEconomizadoMinutos = Math.max(0, tempoBaselineMinutos - tempoComIAMinutos)
-  const tempoEconomizadoHoras = tempoEconomizadoMinutos / 60
-  const tempoEconomizadoAnualHoras = tempoEconomizadoHoras * 12
+  if (isNormalized) {
+    // Estrutura normalizada
+    personsBaseline = indicador.persons_baseline || []
+    personsPostIA = indicador.persons_post_ia || []
+    toolsBaseline = indicador.tools_baseline || []
+    toolsPostIA = indicador.tools_post_ia || []
+
+    frequencyAnualBaseline = convertToAnnualFrequency(
+      indicador.baseline_frequency_real || indicador.frequency_value || 0,
+      indicador.frequency_unit || FrequencyUnit.MONTH
+    )
+
+    frequencyAnualPostIA = convertToAnnualFrequency(
+      indicador.post_ia_frequency || indicador.frequency_value || 0,
+      indicador.frequency_unit || FrequencyUnit.MONTH
+    )
+  } else {
+    // Formato legado (compatibilidade)
+    const baselineData = indicador.baselineData || {}
+    const postIAData = indicador.postIAData || indicador.post_ia_data || {}
+
+    personsBaseline = baselineData.pessoas || []
+    personsPostIA = postIAData.pessoas || []
+
+    // Extrair ferramentas do formato legado
+    const custosData = indicador.custos_data || indicador.custos || {}
+    if (Array.isArray(custosData)) {
+      toolsPostIA = custosData
+    } else if (custosData.custos && Array.isArray(custosData.custos)) {
+      toolsPostIA = custosData.custos
+    }
+
+    // Calcular frequências do formato legado
+    personsBaseline.forEach(p => {
+      const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
+      const periodo = p.frequenciaReal?.periodo || 'Mensal'
+      frequencyAnualBaseline += calcularHorasPorMes(quantidade, periodo) * 12
+    })
+
+    personsPostIA.forEach(p => {
+      const quantidade = toNumber(p.frequenciaReal?.quantidade || 0)
+      const periodo = p.frequenciaReal?.periodo || 'Mensal'
+      frequencyAnualPostIA += calcularHorasPorMes(quantidade, periodo) * 12
+    })
+  }
+
+  // Calcular horas
+  const horasBaselineAnual = calcularHorasBaseline(indicador, personsBaseline)
+  const horasPostIAAnual = calcularHorasPostIA(indicador, personsPostIA)
+  const horasEconomizadasAnual = Math.max(0, horasBaselineAnual - horasPostIAAnual)
+
+  // Calcular custos de mão de obra
+  const custoMaoObraBaselineAnual = calcularCustoMaoObraBaseline(indicador, personsBaseline)
+  const custoMaoObraPostIAAnual = calcularCustoMaoObraPostIA(indicador, personsPostIA)
+
+  // Calcular custos de ferramentas
+  const custoFerramentasBaselineAnual = calcularCustoFerramentasAnual(toolsBaseline, frequencyAnualBaseline)
+  const custoFerramentasPostIAAnual = calcularCustoFerramentasAnual(toolsPostIA, frequencyAnualPostIA)
+
+  // Custos totais
+  const custoTotalBaselineAnual = custoMaoObraBaselineAnual + custoFerramentasBaselineAnual
+  const custoTotalPostIAAnual = custoMaoObraPostIAAnual + custoFerramentasPostIAAnual
+
+  // Economia bruta anual
+  const economiaBrutaAnual = Math.max(0, custoTotalBaselineAnual - custoTotalPostIAAnual)
 
   // Custo hora médio (baseline)
-  const custoHoraMedio = calcularCustoHoraMedio(pessoasBaseline) || 80 // Default R$ 80/hora
+  const custoHoraMedio = calcularCustoHoraMedio(personsBaseline) || 80
 
-  // Economia financeira
-  const economiaBrutaAnual = tempoEconomizadoAnualHoras * custoHoraMedio
+  // Economia de horas convertida para dinheiro (alternativa)
+  const economiaBrutaAnualPorHoras = horasEconomizadasAnual * custoHoraMedio
 
-  // Custos da IA (vem de postIAData ou custos_data)
-  const custoImplementacao = toNumber(postIAData.custoImplementacao || 0)
-  
-  // Calcula custos de ferramentas (suporta formato antigo e novo)
-  let custosArray = []
-  if (Array.isArray(indicador.custos)) {
-    custosArray = indicador.custos
-  } else if (indicador.custos && Array.isArray(indicador.custos.custos)) {
-    custosArray = indicador.custos.custos
-  }
-  const custoMensalFerramentas = custosArray.reduce((total, custo) => {
-    const valor = toNumber(custo.valor)
-    if (custo.tipo === 'anual') {
-      return total + (valor / 12)
-    }
-    return total + valor
-  }, 0)
-  
-  // Custo mensal total (apenas ferramentas, não há mais custoMensalManutencao separado)
-  const custoMensalTotal = custoMensalFerramentas
-  const custoAnualRecorrenteIA = custoMensalTotal * 12
+  // Usar o maior valor entre economia por custos e economia por horas
+  const economiaBrutaAnualFinal = Math.max(economiaBrutaAnual, economiaBrutaAnualPorHoras)
 
-  // Economia líquida
-  const economiaAnual = economiaBrutaAnual - custoAnualRecorrenteIA
+  // Custo de implementação (vem do projeto, não do indicador)
+  const custoImplementacao = 0 // Será calculado no nível do projeto
 
-  // Ganho de Capacidade (%)
-  const ganhoCapacidade = volumeBaseline > 0 
-    ? ((volumeIA / volumeBaseline) - 1) * 100 
-    : 0
-
-  // Eficiência do Processo (%)
-  // Calcula tempo médio por execução
-  const tempoMedioBaseline = pessoasBaseline.length > 0 && volumeBaseline > 0
-    ? tempoBaselineMinutos / volumeBaseline
-    : 0
-  const tempoMedioPostIA = pessoasPostIA.length > 0 && volumeIA > 0
-    ? tempoComIAMinutos / volumeIA
-    : 0
-  const eficiencia = tempoMedioBaseline > 0 
-    ? (1 - (tempoMedioPostIA / tempoMedioBaseline)) * 100 
-    : 0
-
-  // Ganho de Produtividade (%)
-  const ganhoProdutividade = tempoBaselineMinutos > 0
-    ? ((tempoBaselineMinutos - tempoComIAMinutos) / tempoBaselineMinutos) * 100
-    : 0
-
-  // Execuções Equivalentes
-  const execucoesEquivalentes = tempoMedioPostIA > 0 
-    ? tempoMedioBaseline / tempoMedioPostIA 
-    : 0
+  // Economia líquida anual
+  const economiaLiquidaAnual = economiaBrutaAnualFinal - custoFerramentasPostIAAnual
 
   // ROI Percentual (1º Ano)
-  const investimentoTotalAno1 = custoImplementacao + custoAnualRecorrenteIA
+  const investimentoTotalAno1 = custoImplementacao + custoFerramentasPostIAAnual
   const roiPercentual = investimentoTotalAno1 > 0
-    ? ((economiaBrutaAnual - investimentoTotalAno1) / investimentoTotalAno1) * 100
-    : economiaBrutaAnual > 0 ? Infinity : 0
+    ? ((economiaBrutaAnualFinal - investimentoTotalAno1) / investimentoTotalAno1) * 100
+    : economiaBrutaAnualFinal > 0 ? Infinity : 0
 
   // ROI Anos Seguintes (%)
-  const roiAno2Mais = custoAnualRecorrenteIA > 0
-    ? ((economiaBrutaAnual - custoAnualRecorrenteIA) / custoAnualRecorrenteIA) * 100
-    : economiaBrutaAnual > 0 ? Infinity : 0
+  const roiAno2Mais = custoFerramentasPostIAAnual > 0
+    ? ((economiaBrutaAnualFinal - custoFerramentasPostIAAnual) / custoFerramentasPostIAAnual) * 100
+    : economiaBrutaAnualFinal > 0 ? Infinity : 0
 
   // Payback (Meses)
-  const economiaLiquidaMensal = economiaAnual / 12
+  const economiaLiquidaMensal = economiaLiquidaAnual / 12
   let paybackMeses = Infinity
   if (economiaLiquidaMensal > 0 && custoImplementacao > 0) {
     paybackMeses = custoImplementacao / economiaLiquidaMensal
-  } else if (custoImplementacao === 0 && economiaAnual > 0) {
-    paybackMeses = 0 // Imediato
+  } else if (custoImplementacao === 0 && economiaLiquidaAnual > 0) {
+    paybackMeses = 0
   }
 
-  // Custo por execução
-  const custoPorExecucaoBaseline = tempoBaselineMinutos > 0
-    ? (tempoBaselineMinutos * custoHoraMedio) / 60 / volumeBaseline
+  // Ganho de Produtividade (%)
+  const ganhoProdutividade = horasBaselineAnual > 0
+    ? ((horasBaselineAnual - horasPostIAAnual) / horasBaselineAnual) * 100
     : 0
 
-  const custoPorExecucaoComIA = volumeIA > 0
-    ? (tempoComIAMinutos * custoHoraMedio) / 60 / volumeIA + (custoMensalTotal / volumeIA)
+  // Ganho de Capacidade (%)
+  const ganhoCapacidade = frequencyAnualBaseline > 0
+    ? ((frequencyAnualPostIA / frequencyAnualBaseline) - 1) * 100
     : 0
 
-  const economiaExecucao = custoPorExecucaoBaseline - custoPorExecucaoComIA
+  // Eficiência do Processo (%)
+  const tempoMedioBaseline = frequencyAnualBaseline > 0
+    ? horasBaselineAnual / frequencyAnualBaseline
+    : 0
+  const tempoMedioPostIA = frequencyAnualPostIA > 0
+    ? horasPostIAAnual / frequencyAnualPostIA
+    : 0
+  const eficiencia = tempoMedioBaseline > 0
+    ? (1 - (tempoMedioPostIA / tempoMedioBaseline)) * 100
+    : 0
 
   return {
-    // Por execução
-    tempoBaselineMinutos,
-    tempoComIAMinutos,
-    tempoEconomizadoMinutos,
-    custoPorExecucaoBaseline,
-    custoPorExecucaoComIA,
-    economiaExecucao,
-    
-    // Anualizado
-    tempoEconomizadoAnualHoras,
-    economiaBrutaAnual,
-    custoAnualRecorrenteIA,
-    economiaAnual,
-    
-    // Custos detalhados
-    custoImplementacao,
-    custoMensalFerramentas,
-    custoMensalTotal,
-    
+    // Horas
+    horasBaselineAnual,
+    horasPostIAAnual,
+    horasEconomizadasAnual,
+    horasEconomizadasMensal: horasEconomizadasAnual / 12,
+
+    // Custos
+    custoMaoObraBaselineAnual,
+    custoMaoObraPostIAAnual,
+    custoFerramentasBaselineAnual,
+    custoFerramentasPostIAAnual,
+    custoTotalBaselineAnual,
+    custoTotalPostIAAnual,
+
+    // Economia
+    economiaBrutaAnual: economiaBrutaAnualFinal,
+    economiaLiquidaAnual,
+    economiaMensal: economiaLiquidaAnual / 12,
+
     // ROI
     roiPercentual,
     roiAno2Mais,
     paybackMeses,
-    
-    // Produtividade
+
+    // Métricas de produtividade
     ganhoProdutividade,
     ganhoCapacidade,
     eficiencia,
-    execucoesEquivalentes,
-    
+
     // Dados de referência
-    volumeBaseline,
-    volumeIA,
+    frequencyAnualBaseline,
+    frequencyAnualPostIA,
     custoHoraMedio
   }
 }
@@ -236,7 +427,7 @@ export const calcularROIIndicador = (indicador) => {
 /**
  * Calcula ROI consolidado de um projeto
  */
-export const calcularROIProjeto = (projetoId, indicators) => {
+export const calcularROIProjeto = (projetoId, indicators, projectData = null) => {
   if (!indicators || indicators.length === 0) {
     return {
       totalIndicadores: 0,
@@ -253,8 +444,12 @@ export const calcularROIProjeto = (projetoId, indicators) => {
     }
   }
 
-  const indicadoresDoProjeto = indicators.filter(i => i && i.projetoId === projetoId)
-  
+  const indicadoresDoProjeto = indicators.filter(i => {
+    if (!i) return false
+    // Verificar se pertence ao projeto (formato normalizado ou legado)
+    return i.project_id === projetoId || i.projetoId === projetoId
+  })
+
   if (indicadoresDoProjeto.length === 0) {
     return {
       totalIndicadores: 0,
@@ -278,7 +473,7 @@ export const calcularROIProjeto = (projetoId, indicators) => {
 
   // Consolidação
   const economiaAnualTotal = indicadoresDetalhados.reduce(
-    (sum, item) => sum + (item.metricas?.economiaAnual || 0), 0
+    (sum, item) => sum + (item.metricas?.economiaLiquidaAnual || 0), 0
   )
 
   const economiaBrutaAnualTotal = indicadoresDetalhados.reduce(
@@ -286,37 +481,38 @@ export const calcularROIProjeto = (projetoId, indicators) => {
   )
 
   const tempoEconomizadoAnualHoras = indicadoresDetalhados.reduce(
-    (sum, item) => sum + (item.metricas?.tempoEconomizadoAnualHoras || 0), 0
+    (sum, item) => sum + (item.metricas?.horasEconomizadasAnual || 0), 0
   )
 
-  const custoImplementacaoTotal = indicadoresDetalhados.reduce(
-    (sum, item) => sum + (item.metricas?.custoImplementacao || 0), 0
-  )
+  // Custo de implementação vem do projeto
+  const custoImplementacaoTotal = projectData?.implementation_cost || 0
+  const custoMensalManutencao = projectData?.monthly_maintenance_cost || 0
+  const custoAnualManutencao = custoMensalManutencao * 12
 
+  // Custo anual recorrente total (ferramentas dos indicadores + manutenção do projeto)
   const custoAnualRecorrenteTotal = indicadoresDetalhados.reduce(
-    (sum, item) => sum + (item.metricas?.custoAnualRecorrenteIA || 0), 0
-  )
+    (sum, item) => sum + (item.metricas?.custoFerramentasPostIAAnual || 0), 0
+  ) + custoAnualManutencao
+
+  // Investimento total primeiro ano
+  const investimentoTotalAno1 = custoImplementacaoTotal + custoAnualRecorrenteTotal
 
   // ROI Geral
-  const investimentoTotal = custoImplementacaoTotal + custoAnualRecorrenteTotal
-  const roiGeral = investimentoTotal > 0
-    ? ((economiaBrutaAnualTotal - investimentoTotal) / investimentoTotal) * 100
+  const roiGeral = investimentoTotalAno1 > 0
+    ? ((economiaBrutaAnualTotal - investimentoTotalAno1) / investimentoTotalAno1) * 100
     : economiaBrutaAnualTotal > 0 ? Infinity : 0
 
   // Payback Médio
-  const paybacks = indicadoresDetalhados
-    .map(item => item.metricas?.paybackMeses)
-    .filter(p => p !== undefined && p !== Infinity && !isNaN(p))
-  
-  const paybackMedioMeses = paybacks.length > 0
-    ? paybacks.reduce((sum, p) => sum + p, 0) / paybacks.length
+  const economiaLiquidaMensal = economiaAnualTotal / 12
+  const paybackMedioMeses = economiaLiquidaMensal > 0 && custoImplementacaoTotal > 0
+    ? custoImplementacaoTotal / economiaLiquidaMensal
     : Infinity
 
   // Ganho de Produtividade Médio
   const ganhosProdutividade = indicadoresDetalhados
     .map(item => item.metricas?.ganhoProdutividade)
     .filter(g => g !== undefined && !isNaN(g) && g > 0)
-  
+
   const ganhoProdutividadeMedio = ganhosProdutividade.length > 0
     ? ganhosProdutividade.reduce((sum, g) => sum + g, 0) / ganhosProdutividade.length
     : 0
@@ -325,7 +521,7 @@ export const calcularROIProjeto = (projetoId, indicators) => {
   const ganhosCapacidade = indicadoresDetalhados
     .map(item => item.metricas?.ganhoCapacidade)
     .filter(g => g !== undefined && !isNaN(g) && g > 0)
-  
+
   const ganhoCapacidadeMedio = ganhosCapacidade.length > 0
     ? ganhosCapacidade.reduce((sum, g) => sum + g, 0) / ganhosCapacidade.length
     : 0
@@ -338,6 +534,7 @@ export const calcularROIProjeto = (projetoId, indicators) => {
     roiGeral,
     custoImplementacaoTotal,
     custoAnualRecorrenteTotal,
+    custoAnualManutencao,
     paybackMedioMeses,
     ganhoProdutividadeMedio,
     ganhoCapacidadeMedio,
