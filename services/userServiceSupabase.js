@@ -205,10 +205,13 @@ export const userServiceSupabase = {
         // Remove da cache quando completa (sucesso ou erro)
         pendingQueries.delete(id)
 
-        if (error) {
+      if (error) {
+        // Não loga timeout como erro crítico - é esperado em alguns casos
+        if (!error.message?.includes('Timeout')) {
           console.error('Erro ao buscar usuário:', error)
-          return null
         }
+        return null
+      }
 
         return data
       } catch (error) {

@@ -15,6 +15,18 @@ import { PostIATab } from '../../src/features/projects/PostIATab'
 import { TIPOS_INDICADOR, CAMPOS_POR_TIPO } from '../../config/indicatorTypes'
 import { normalizarTipoIndicador } from '../../utils/indicatorUtils'
 
+// Mapeamento dos tipos do sistema antigo para os novos tipos
+const TIPO_MAPPING = {
+  'Produtividade': 'PRODUTIVIDADE',
+  'Capacidade Analítica': 'CAPACIDADE ANALÍTICA',
+  'Incremento Receita': 'INCREMENTO RECEITA',
+  'Melhoria Margem': 'MELHORIA MARGEM',
+  'Redução de Risco': 'REDUÇÃO DE RISCO',
+  'Qualidade Decisão': 'QUALIDADE DECISÃO',
+  'Velocidade': 'VELOCIDADE',
+  'Satisfação': 'SATISFAÇÃO'
+}
+
 const IndicatorForm = () => {
   const { id, indicatorId } = useParams()
   const navigate = useNavigate()
@@ -497,9 +509,23 @@ const IndicatorForm = () => {
         camposEspecificos: formData.camposEspecificos
       }
 
-      const baselineDataToSave = formData.baselineData || (formData.baseline?.pessoas?.length > 0 ? {
-        pessoas: formData.baseline.pessoas
-      } : {})
+      // Construir baselineData garantindo que sempre tenha tipo
+      let baselineDataToSave = formData.baselineData || {}
+      
+      // Se não tem tipo, adicionar baseado no tipoIndicador
+      if (!baselineDataToSave.tipo && formData.tipoIndicador) {
+        baselineDataToSave.tipo = TIPO_MAPPING[formData.tipoIndicador] || 'PRODUTIVIDADE'
+      }
+      
+      // Se não tem pessoas mas formData.baseline tem, adicionar
+      if (!baselineDataToSave.pessoas && formData.baseline?.pessoas?.length > 0) {
+        baselineDataToSave.pessoas = formData.baseline.pessoas
+      }
+      
+      // Se ainda não tem tipo, usar PRODUTIVIDADE como padrão
+      if (!baselineDataToSave.tipo) {
+        baselineDataToSave.tipo = 'PRODUTIVIDADE'
+      }
 
       const iaData = {
         precisaValidacao: formData.comIA.precisaValidacao,
@@ -512,7 +538,25 @@ const IndicatorForm = () => {
         custos: formData.custos || []
       }
 
-      const postIADataToSave = formData.postIAData || {}
+      // Construir postIAData garantindo que sempre tenha tipo
+      let postIADataToSave = formData.postIAData || {}
+      
+      // Se não tem tipo, usar o mesmo tipo do baselineData
+      if (!postIADataToSave.tipo && baselineDataToSave.tipo) {
+        postIADataToSave.tipo = baselineDataToSave.tipo
+      }
+      
+      // Se ainda não tem tipo, usar PRODUTIVIDADE como padrão
+      if (!postIADataToSave.tipo) {
+        postIADataToSave.tipo = 'PRODUTIVIDADE'
+      }
+      
+      // DEBUG: Log dos dados antes de salvar
+      console.log('📝 IndicatorForm - Dados antes de salvar:', {
+        baselineDataToSave,
+        postIADataToSave,
+        tipoIndicador: formData.tipoIndicador
+      })
 
       // Cria ou atualiza no Supabase usando métodos do contexto (atualiza estado global)
       if (shouldCreateNew) {
